@@ -103,8 +103,8 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
 		}
 
-		$opt_token = $this->config['option_token'] ?? 'd4h_calendar_api_token';
-		$token     = get_option( $opt_token, '' );
+		$option_name_token = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$token             = get_option( $option_name_token, '' );
 
 		if ( $token === '' ) {
 			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-calendar' ) ), 400 );
@@ -118,8 +118,8 @@ final class Admin {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
 		}
 
-		$opt_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
-		$updated    = get_option( $opt_updated, 0 );
+		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
+		$updated                  = get_option( $option_name_last_updated, 0 );
 		$formatted  = $updated ? wp_date( 'j M Y, H:i', $updated ) : __( 'Never', 'd4h-calendar' );
 
 		wp_send_json_success( array( 'last_updated' => $formatted, 'last_updated_ts' => $updated ) );
@@ -149,17 +149,17 @@ final class Admin {
 	}
 
 	private function save_credentials(): void {
-		$opt_token = $this->config['option_token'] ?? 'd4h_calendar_api_token';
-		$opt_ctx   = $this->config['option_context'] ?? 'd4h_calendar_api_context';
-		$opt_ctxid = $this->config['option_context_id'] ?? 'd4h_calendar_api_context_id';
+		$option_name_token   = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$option_name_org     = $this->config['option_context'] ?? 'd4h_calendar_api_org';
+		$option_name_org_id  = $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id';
 
-		$token = isset( $_POST['d4h_api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_token'] ) ) : '';
-		$ctx   = isset( $_POST['d4h_api_context'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context'] ) ) : '';
-		$ctxid = isset( $_POST['d4h_api_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context_id'] ) ) : '';
+		$token   = isset( $_POST['d4h_api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_token'] ) ) : '';
+		$org_type = isset( $_POST['d4h_api_context'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context'] ) ) : '';
+		$org_id   = isset( $_POST['d4h_api_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context_id'] ) ) : '';
 
-		update_option( $opt_token, $token, false );
-		update_option( $opt_ctx, $ctx, false );
-		update_option( $opt_ctxid, $ctxid, false );
+		update_option( $option_name_token, $token, false );
+		update_option( $option_name_org, $org_type, false );
+		update_option( $option_name_org_id, $org_id, false );
 
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
 		wp_safe_redirect( $url );
@@ -188,15 +188,15 @@ final class Admin {
 	 * Renders the admin page: API credentials form, Sync now, Last updated.
 	 */
 	public function render_page(): void {
-		$opt_token  = $this->config['option_token'] ?? 'd4h_calendar_api_token';
-		$opt_ctx    = $this->config['option_context'] ?? 'd4h_calendar_api_context';
-		$opt_ctxid  = $this->config['option_context_id'] ?? 'd4h_calendar_api_context_id';
-		$opt_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
+		$option_name_token      = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$option_name_org        = $this->config['option_context'] ?? 'd4h_calendar_api_org';
+		$option_name_org_id     = $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id';
+		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
 
-		$token  = get_option( $opt_token, '' );
-		$ctx    = get_option( $opt_ctx, '' );
-		$ctxid  = get_option( $opt_ctxid, '' );
-		$updated = get_option( $opt_updated, 0 );
+		$token    = get_option( $option_name_token, '' );
+		$org_type = get_option( $option_name_org, '' );
+		$org_id   = get_option( $option_name_org_id, '' );
+		$updated  = get_option( $option_name_last_updated, 0 );
 
 		$page_title = esc_html( $this->config['admin_page_title'] ?? 'D4H Calendar' );
 
@@ -225,11 +225,11 @@ final class Admin {
 					</tr>
 					<tr>
 						<th scope="row"><label for="d4h_api_context"><?php esc_html_e( 'team or organisation (optional)', 'd4h-calendar' ); ?></label></th>
-						<td><input type="text" id="d4h_api_context" name="d4h_api_context" value="<?php echo esc_attr( $ctx ); ?>" placeholder="team or organisation" class="regular-text" /></td>
+						<td><input type="text" id="d4h_api_context" name="d4h_api_context" value="<?php echo esc_attr( $org_type ); ?>" placeholder="team or organisation" class="regular-text" /></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="d4h_api_context_id"><?php esc_html_e( 'Team ID (optional)', 'd4h-calendar' ); ?></label></th>
-						<td><input type="text" id="d4h_api_context_id" name="d4h_api_context_id" value="<?php echo esc_attr( $ctxid ); ?>" class="regular-text" /></td>
+						<td><input type="text" id="d4h_api_context_id" name="d4h_api_context_id" value="<?php echo esc_attr( $org_id ); ?>" class="regular-text" /></td>
 					</tr>
 				</table>
 				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save credentials', 'd4h-calendar' ); ?>" /></p>

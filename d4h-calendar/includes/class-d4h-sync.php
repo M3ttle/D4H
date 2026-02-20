@@ -37,8 +37,8 @@ final class Sync {
 	 * @return true|\WP_Error
 	 */
 	public function run_full_sync() {
-		$context   = get_option( $this->config['option_context'] ?? 'd4h_calendar_api_context', '' );
-		$context_id = get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_context_id', '' );
+		$context   = get_option( $this->config['option_context'] ?? 'd4h_calendar_api_org', '' );
+		$context_id = get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id', '' );
 
 		if ( empty( $context ) || empty( $context_id ) ) {
 			$whoami = $this->api->whoami();
@@ -86,10 +86,10 @@ final class Sync {
 	 */
 	private function normalize_activities( array $raw, string $resource_type ): array {
 		$items = array();
-		foreach ( $raw as $r ) {
-			$id   = isset( $r['id'] ) ? (string) $r['id'] : '';
-			$start = isset( $r['startsAt'] ) ? $r['startsAt'] : ( $r['starts_at'] ?? '' );
-			$end   = isset( $r['endsAt'] ) ? $r['endsAt'] : ( $r['ends_at'] ?? null );
+		foreach ( $raw as $raw_item ) {
+			$id    = isset( $raw_item['id'] ) ? (string) $raw_item['id'] : '';
+			$start = isset( $raw_item['startsAt'] ) ? $raw_item['startsAt'] : ( $raw_item['starts_at'] ?? '' );
+			$end   = isset( $raw_item['endsAt'] ) ? $raw_item['endsAt'] : ( $raw_item['ends_at'] ?? null );
 			if ( $id === '' || $start === '' ) {
 				continue;
 			}
@@ -100,7 +100,7 @@ final class Sync {
 				'ends_at'       => $end !== null && $end !== ''
 					? ( is_numeric( $end ) ? gmdate( 'Y-m-d H:i:s', (int) $end ) : $end )
 					: null,
-				'payload'       => $r,
+				'payload'       => $raw_item,
 			);
 		}
 		return $items;

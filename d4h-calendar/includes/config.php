@@ -21,8 +21,8 @@ function d4h_calendar_get_config() {
 
 		// Option keys (credentials saved from admin form; do not put secrets in this file)
 		'option_token'       => 'd4h_calendar_api_token',
-		'option_context'     => 'd4h_calendar_api_context',
-		'option_context_id'  => 'd4h_calendar_api_context_id',
+		'option_context'     => 'd4h_calendar_api_org',
+		'option_context_id'  => 'd4h_calendar_api_org_id',
 		'option_last_updated'=> 'd4h_calendar_last_updated',
 
 		// Cron

@@ -33,15 +33,15 @@ final class Cron {
 	 * @return array<string, array{interval: int, display: string}>
 	 */
 	public function add_schedule( array $schedules ): array {
-		$name   = $this->config['cron_schedule_name'] ?? 'd4h_calendar_every_two_hours';
-		$sec    = (int) ( $this->config['cron_interval_sec'] ?? 7200 );
+		$schedule_name      = $this->config['cron_schedule_name'] ?? 'd4h_calendar_every_two_hours';
+		$interval_seconds   = (int) ( $this->config['cron_interval_sec'] ?? 7200 );
 
-		$schedules[ $name ] = array(
-			'interval' => $sec,
+		$schedules[ $schedule_name ] = array(
+			'interval' => $interval_seconds,
 			'display'  => sprintf(
 				/* translators: %d: interval in hours */
 				__( 'Every %d hours', 'd4h-calendar' ),
-				$sec / 3600
+				$interval_seconds / 3600
 			),
 		);
 		return $schedules;
@@ -76,11 +76,11 @@ final class Cron {
 	 * Schedule the cron event. Call on activation.
 	 */
 	public function schedule(): void {
-		$hook   = $this->config['cron_hook'] ?? 'd4h_calendar_sync';
-		$name   = $this->config['cron_schedule_name'] ?? 'd4h_calendar_every_two_hours';
+		$hook_name    = $this->config['cron_hook'] ?? 'd4h_calendar_sync';
+		$schedule_name = $this->config['cron_schedule_name'] ?? 'd4h_calendar_every_two_hours';
 
-		if ( ! wp_next_scheduled( $hook ) ) {
-			wp_schedule_event( time(), $name, $hook );
+		if ( ! wp_next_scheduled( $hook_name ) ) {
+			wp_schedule_event( time(), $schedule_name, $hook_name );
 		}
 	}
 
@@ -88,11 +88,11 @@ final class Cron {
 	 * Clear the cron event. Call on uninstall.
 	 */
 	public static function unschedule( array $config ): void {
-		$hook = $config['cron_hook'] ?? 'd4h_calendar_sync';
-		$ts   = wp_next_scheduled( $hook );
-		if ( $ts ) {
-			wp_unschedule_event( $ts, $hook );
+		$hook_name         = $config['cron_hook'] ?? 'd4h_calendar_sync';
+		$next_run_timestamp = wp_next_scheduled( $hook_name );
+		if ( $next_run_timestamp ) {
+			wp_unschedule_event( $next_run_timestamp, $hook_name );
 		}
-		wp_clear_scheduled_hook( $hook );
+		wp_clear_scheduled_hook( $hook_name );
 	}
 }

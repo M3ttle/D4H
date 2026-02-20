@@ -27,10 +27,10 @@ final class REST {
 	}
 
 	public function register_routes(): void {
-		$ns   = $this->config['rest_namespace'] ?? 'd4h-calendar/v1';
-		$route = $this->config['rest_activities_route'] ?? 'activities';
+		$namespace        = $this->config['rest_namespace'] ?? 'd4h-calendar/v1';
+		$activities_route = $this->config['rest_activities_route'] ?? 'activities';
 
-		register_rest_route( $ns, '/' . $route, array(
+		register_rest_route( $namespace, '/' . $activities_route, array(
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => array( $this, 'get_activities' ),
 			'permission_callback' => '__return_true',
@@ -113,8 +113,8 @@ final class REST {
 		if ( $param === null || $param === '' ) {
 			return true;
 		}
-		$ts = strtotime( (string) $param );
-		if ( ! $ts ) {
+		$timestamp = strtotime( (string) $param );
+		if ( ! $timestamp ) {
 			return new \WP_Error( 'invalid_date', __( 'Invalid date format.', 'd4h-calendar' ), array( 'status' => 400 ) );
 		}
 		return true;
@@ -125,8 +125,8 @@ final class REST {
 		if ( $val === '' ) {
 			return '';
 		}
-		$ts = strtotime( $val );
-		return $ts ? gmdate( 'Y-m-d H:i:s', $ts ) : '';
+		$timestamp = strtotime( $val );
+		return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : '';
 	}
 
 	/**
@@ -140,11 +140,11 @@ final class REST {
 		$exercise_color = $this->config['calendar_exercise_color'] ?? '#6c757d';
 
 		$events = array();
-		foreach ( $activities as $a ) {
-			$type  = $a['resource_type'] ?? 'event';
-			$title = $this->get_title( $a );
-			$start = $a['starts_at'] ?? '';
-			$end   = $a['ends_at'] ?? null;
+		foreach ( $activities as $activity ) {
+			$type  = $activity['resource_type'] ?? 'event';
+			$title = $this->get_title( $activity );
+			$start = $activity['starts_at'] ?? '';
+			$end   = $activity['ends_at'] ?? null;
 
 			if ( $start === '' ) {
 				continue;
@@ -153,7 +153,7 @@ final class REST {
 			$color = ( $type === 'exercise' ) ? $exercise_color : $event_color;
 
 			$event = array(
-				'id'            => sanitize_key( (string) ( $a['id'] ?? '' ) ) . '-' . $type,
+				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,
 				'title'         => $title,
 				'start'         => $start,
 				'color'         => $color,
@@ -167,8 +167,8 @@ final class REST {
 		return $events;
 	}
 
-	private function get_title( array $a ): string {
-		$payload = $a['payload'] ?? array();
+	private function get_title( array $activity ): string {
+		$payload = $activity['payload'] ?? array();
 		$raw     = '';
 		if ( isset( $payload['reference'] ) && (string) $payload['reference'] !== '' ) {
 			$raw = (string) $payload['reference'];
@@ -177,7 +177,7 @@ final class REST {
 		} elseif ( isset( $payload['description'] ) && (string) $payload['description'] !== '' ) {
 			$raw = wp_trim_words( (string) $payload['description'], 8 );
 		} else {
-			return $a['resource_type'] === 'exercise'
+			return $activity['resource_type'] === 'exercise'
 				? __( 'Exercise', 'd4h-calendar' )
 				: __( 'Event', 'd4h-calendar' );
 		}
