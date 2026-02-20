@@ -16,15 +16,18 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 2. **Configure**: Go to **Settings → D4H Calendar**, enter your D4H API token (and optionally context/contextId), save. Adjust other behaviour via `d4h-calendar/includes/config.php` if needed (cron interval, retention days, etc.).
 3. **Calendar**: Add shortcode `[d4h_calendar]` to any page or post to show the calendar.
 
-## Project structure (current – Step 2)
+## Project structure (current – Step 3)
 
 - `d4h-calendar/d4h-calendar.php` – Plugin header and bootstrap load.
 - `d4h-calendar/includes/config.php` – Single config array (no secrets).
-- `d4h-calendar/includes/class-d4h-loader.php` – Wires config, Database, Repository, Admin on `plugins_loaded`.
+- `d4h-calendar/includes/class-d4h-loader.php` – Wires config, Database, Repository, Cron, Admin on `plugins_loaded`.
 - `d4h-calendar/includes/class-d4h-database.php` – Table schema (dbDelta) and table name from config.
 - `d4h-calendar/includes/class-d4h-api-client.php` – HTTP client for D4H API (whoami, get_events, get_exercises) with pagination.
 - `d4h-calendar/includes/class-d4h-repository.php` – Storage: replace_activities, get_activities, delete_older_than.
 - `d4h-calendar/includes/class-d4h-sync.php` – Sync orchestration: run_full_sync (fetch from API, store, update last_updated).
-- `d4h-calendar/includes/class-d4h-admin.php` – **Settings → D4H Calendar**: API credentials form, “Sync now” (POST), “Last updated” display.
+- `d4h-calendar/includes/class-d4h-cron.php` – Cron: custom interval (2h), schedule event on activation, run sync on hook.
+- `d4h-calendar/includes/class-d4h-admin.php` – **Settings → D4H Calendar**: API credentials form, “Update now” (AJAX), “Last updated”, “Delete data older than 90 days” (AJAX).
+- `d4h-calendar/admin/admin.js` – Admin script for AJAX Update now and Delete buttons.
+- `d4h-calendar/uninstall.php` – Clears scheduled cron on uninstall.
 
-Further steps (see `.cursor/plans/`): cron + admin AJAX (Step 3), frontend calendar + REST (Step 4), security and cleanup (Step 5).
+Further steps (see `.cursor/plans/`): frontend calendar + REST (Step 4), security and cleanup (Step 5).

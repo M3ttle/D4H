@@ -39,6 +39,10 @@ function d4h_calendar_get_config() {
 		'enable_cron'        => true,
 		'enable_delete_btn'  => true,
 
+		// AJAX actions (admin-only)
+		'ajax_action_sync'   => 'd4h_calendar_ajax_sync',
+		'ajax_action_delete' => 'd4h_calendar_ajax_delete',
+
 		// Admin
 		'admin_capability'   => 'manage_options',
 		'admin_menu_slug'    => 'd4h-calendar',

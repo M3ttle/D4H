@@ -19,6 +19,7 @@ require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-database.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-api-client.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-repository.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-sync.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-cron.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-admin.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-loader.php';
 
@@ -34,4 +35,9 @@ register_activation_hook( D4H_CALENDAR_PLUGIN_FILE, function () {
 	$config['table_name'] = $wpdb->prefix . ( $config['table_name_prefix'] ?? 'd4h_calendar_' ) . 'activities';
 	$database = new D4H_Calendar\Database( $config );
 	$database->maybe_create_tables();
+
+	if ( ! empty( $config['enable_cron'] ) ) {
+		$cron = new D4H_Calendar\Cron( $config );
+		$cron->schedule();
+	}
 } );

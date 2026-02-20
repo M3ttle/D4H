@@ -37,6 +37,9 @@ final class Loader {
 		$this->repository = new Repository( $this->config, $this->database );
 		$this->admin      = new Admin( $this->config, $this->database, $this->repository );
 
+		$cron = new Cron( $this->config );
+		$cron->register_hooks();
+
 		$this->admin->register_hooks();
 	}
 
