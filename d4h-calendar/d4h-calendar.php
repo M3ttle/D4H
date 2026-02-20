@@ -1,0 +1,34 @@
+<?php
+/**
+ * Plugin Name: D4H Calendar
+ * Description: Fetches events and exercises from D4H Team Manager API, stores them locally, and displays them in a calendar. Sync via cron or manual update from admin.
+ * Version: 1.0.0
+ * Author: D4H
+ * License: GPL v2 or later
+ * Text Domain: d4h-calendar
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+const D4H_CALENDAR_VERSION = '1.0.0';
+const D4H_CALENDAR_PLUGIN_FILE = __FILE__;
+const D4H_CALENDAR_PLUGIN_DIR = __DIR__;
+
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/config.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-database.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-admin.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-loader.php';
+
+add_action( 'plugins_loaded', function () {
+	$config = d4h_calendar_get_config();
+	$loader = new D4H_Calendar\Loader( $config );
+	$loader->init();
+}, 5 );
+
+register_activation_hook( D4H_CALENDAR_PLUGIN_FILE, function () {
+	$config   = d4h_calendar_get_config();
+	global $wpdb;
+	$config['table_name'] = $wpdb->prefix . ( $config['table_name_prefix'] ?? 'd4h_calendar_' ) . 'activities';
+	$database = new D4H_Calendar\Database( $config );
+	$database->maybe_create_tables();
+} );
