@@ -16,7 +16,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 2. **Configure**: Go to **Settings → D4H Calendar**, enter your D4H API token (and optionally context/contextId), save. Adjust other behaviour via `d4h-calendar/includes/config.php` if needed (cron interval, retention days, etc.).
 3. **Calendar**: Add shortcode `[d4h_calendar]` to any page or post to show the calendar.
 
-## Project structure (current – Step 4)
+## Project structure
 
 - `d4h-calendar/d4h-calendar.php` – Plugin header and bootstrap load.
 - `d4h-calendar/includes/config.php` – Single config array (no secrets).
@@ -33,4 +33,4 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 - `d4h-calendar/assets/calendar.js` – Frontend script that initializes FullCalendar with REST URL.
 - `d4h-calendar/uninstall.php` – Clears scheduled cron on uninstall.
 
-Further steps (see `.cursor/plans/`): security and cleanup (Step 5).
+Security: nonces and capability checks on AJAX, REST date validation and range limit, escaped output, cron cleared on uninstall.

@@ -47,7 +47,8 @@ final class Admin {
 	 */
 	public function handle_post(): void {
 		$slug = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
-		if ( ! isset( $_GET['page'] ) || $_GET['page'] !== $slug ) {
+		$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $page !== $slug ) {
 			return;
 		}
 		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
