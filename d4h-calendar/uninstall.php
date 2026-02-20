@@ -7,10 +7,13 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-$config = array(
-	'cron_hook' => 'd4h_calendar_sync',
-);
+$plugin_dir = dirname( __FILE__ );
+$config_file = $plugin_dir . '/includes/config.php';
+$cron_file   = $plugin_dir . '/includes/class-d4h-cron.php';
 
-if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
-	wp_clear_scheduled_hook( $config['cron_hook'] );
+if ( file_exists( $config_file ) && file_exists( $cron_file ) ) {
+	require_once $config_file;
+	require_once $cron_file;
+	$config = d4h_calendar_get_config();
+	D4H_Calendar\Cron::unschedule( $config );
 }

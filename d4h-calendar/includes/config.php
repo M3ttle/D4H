@@ -29,6 +29,19 @@ function d4h_calendar_get_config() {
 		'cron_interval_sec'  => 7200, // 2 hours
 		'cron_hook'          => 'd4h_calendar_sync',
 		'cron_schedule_name' => 'd4h_calendar_every_two_hours',
+		'cron_lock_ttl_sec'  => 900, // 15 minutes – transient lock TTL in case of crash
+		'option_cron_interval_sec' => 'd4h_calendar_cron_interval_sec', // Admin override; falls back to cron_interval_sec
+		'cron_interval_presets'    => array(
+			3600   => array( 'name' => 'd4h_calendar_1h',  'label' => '1 hour' ),
+			7200   => array( 'name' => 'd4h_calendar_2h',  'label' => '2 hours' ),
+			21600  => array( 'name' => 'd4h_calendar_6h',  'label' => '6 hours' ),
+			43200  => array( 'name' => 'd4h_calendar_12h', 'label' => '12 hours' ),
+			86400  => array( 'name' => 'd4h_calendar_24h', 'label' => '24 hours' ),
+		),
+
+		// Sync status options (error handling)
+		'option_last_sync_error'  => 'd4h_calendar_last_sync_error',
+		'option_last_sync_status' => 'd4h_calendar_last_sync_status',
 
 		// Retention and data
 		'retention_days'     => 90,

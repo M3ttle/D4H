@@ -65,6 +65,11 @@ final class Admin {
 				$this->save_credentials();
 			}
 		}
+		if ( $action === 'save_sync_interval' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_sync_interval' ) ) {
+				$this->save_sync_interval();
+			}
+		}
 	}
 
 	/**
@@ -114,9 +119,17 @@ final class Admin {
 		$sync   = new Sync( $this->config, $api, $this->repository );
 		$result = $sync->run_full_sync();
 
+		$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
+		$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+
 		if ( is_wp_error( $result ) ) {
+			update_option( $option_error, $result->get_error_message(), false );
+			update_option( $option_status, 'error', false );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
 		}
+
+		delete_option( $option_error );
+		update_option( $option_status, 'success', false );
 
 		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
 		$updated                  = get_option( $option_name_last_updated, 0 );
@@ -160,6 +173,28 @@ final class Admin {
 		update_option( $option_name_token, $token, false );
 		update_option( $option_name_org, $org_type, false );
 		update_option( $option_name_org_id, $org_id, false );
+
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	private function save_sync_interval(): void {
+		$option_key = $this->config['option_cron_interval_sec'] ?? 'd4h_calendar_cron_interval_sec';
+		$presets    = $this->config['cron_interval_presets'] ?? array();
+		$raw        = isset( $_POST['d4h_cron_interval_sec'] ) ? (int) $_POST['d4h_cron_interval_sec'] : 0;
+
+		if ( $raw > 0 && isset( $presets[ $raw ] ) ) {
+			update_option( $option_key, $raw, false );
+		} else {
+			delete_option( $option_key );
+		}
+
+		if ( ! empty( $this->config['enable_cron'] ) ) {
+			Cron::unschedule( $this->config );
+			$cron = new Cron( $this->config );
+			$cron->schedule();
+		}
 
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
 		wp_safe_redirect( $url );
@@ -237,7 +272,43 @@ final class Admin {
 
 			<hr />
 
+			<h2><?php esc_html_e( 'Sync interval', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_interval  = $this->config['option_cron_interval_sec'] ?? 'd4h_calendar_cron_interval_sec';
+			$config_interval  = (int) ( $this->config['cron_interval_sec'] ?? 7200 );
+			$current_interval = (int) get_option( $option_interval, 0 );
+			$effective_interval = $current_interval > 0 ? $current_interval : $config_interval;
+			$presets = $this->config['cron_interval_presets'] ?? array();
+			?>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'd4h_calendar_save_sync_interval', 'd4h_calendar_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="save_sync_interval" />
+				<label for="d4h_cron_interval_sec"><?php esc_html_e( 'Sync interval:', 'd4h-calendar' ); ?></label>
+				<select id="d4h_cron_interval_sec" name="d4h_cron_interval_sec">
+					<option value="0" <?php selected( $current_interval, 0 ); ?>><?php esc_html_e( 'Use config default', 'd4h-calendar' ); ?></option>
+					<?php foreach ( $presets as $sec => $preset ) : ?>
+						<?php $label = is_array( $preset ) ? ( $preset['label'] ?? $sec . 's' ) : $sec . 's'; ?>
+						<option value="<?php echo (int) $sec; ?>" <?php selected( $current_interval, (int) $sec ); ?>><?php echo esc_html( $label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<button type="submit" class="button button-secondary"><?php esc_attr_e( 'Save interval', 'd4h-calendar' ); ?></button>
+			</form>
+			<p class="description"><?php esc_html_e( 'How often the calendar syncs with D4H (when using cron).', 'd4h-calendar' ); ?></p>
+
+			<hr />
+
 			<h2><?php esc_html_e( 'Sync', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
+			$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+			$last_status   = get_option( $option_status, '' );
+			$last_error    = get_option( $option_error, '' );
+			?>
+			<?php if ( $last_status === 'error' && $last_error ) : ?>
+				<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php echo esc_html( $last_error ); ?></p></div>
+			<?php elseif ( $last_status === 'success' ) : ?>
+				<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php esc_html_e( 'Success', 'd4h-calendar' ); ?></p>
+			<?php endif; ?>
 			<p><strong><?php esc_html_e( 'Last updated:', 'd4h-calendar' ); ?></strong>
 				<span id="d4h-last-updated"><?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?></span>
 			</p>
