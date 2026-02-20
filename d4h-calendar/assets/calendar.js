@@ -70,8 +70,8 @@
 	}
 
 	var icelandicMonths = [
-		'janúar', 'febrúar', 'mars', 'apríl', 'maí', 'júní',
-		'júlí', 'ágúst', 'september', 'október', 'nóvember', 'desember',
+		'Janúar', 'Febrúar', 'Mars', 'Apríl', 'Maí', 'Júní',
+		'Júlí', 'Ágúst', 'September', 'Október', 'Nóvember', 'Desember',
 	];
 
 	function toNativeDate(d) {
@@ -132,6 +132,17 @@
 					hour12: false,
 				},
 				titleFormat: { year: 'numeric', month: 'long' },
+				datesSet: function (arg) {
+					var view = arg.view;
+					var start = view && view.activeStart;
+					var titleEl = el.querySelector('.fc-toolbar-title');
+					if (titleEl && start) {
+						var d = toNativeDate(start);
+						if (d) {
+							titleEl.textContent = formatTitle(d);
+						}
+					}
+				},
 			});
 			cal.render();
 		});
