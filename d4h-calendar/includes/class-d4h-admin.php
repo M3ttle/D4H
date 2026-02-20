@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin: menu, settings page, and (later) API credentials form and AJAX handlers.
+ * Admin: menu, API credentials form, and Sync now (Step 2). AJAX in Step 3.
  *
  * @package D4H_Calendar
  */
@@ -14,15 +14,100 @@ final class Admin {
 	/** @var array<string, mixed> */
 	private $config;
 
+	/** @var Database */
+	private $database;
+
+	/** @var Repository */
+	private $repository;
+
 	/**
 	 * @param array<string, mixed> $config
+	 * @param Database             $database
+	 * @param Repository           $repository
 	 */
-	public function __construct( array $config ) {
-		$this->config = $config;
+	public function __construct( array $config, Database $database, Repository $repository ) {
+		$this->config    = $config;
+		$this->database  = $database;
+		$this->repository = $repository;
 	}
 
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu_page' ) );
+		add_action( 'admin_init', array( $this, 'handle_post' ) );
+	}
+
+	/**
+	 * Handles POST: save credentials or run sync.
+	 */
+	public function handle_post(): void {
+		$slug = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
+		if ( ! isset( $_GET['page'] ) || $_GET['page'] !== $slug ) {
+			return;
+		}
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			return;
+		}
+		if ( empty( $_POST ) || ! isset( $_POST['d4h_calendar_action'] ) ) {
+			return;
+		}
+
+		$action = sanitize_text_field( wp_unslash( $_POST['d4h_calendar_action'] ) );
+
+		if ( $action === 'save_credentials' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_credentials' ) ) {
+				$this->save_credentials();
+			}
+			return;
+		}
+
+		if ( $action === 'sync_now' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_sync_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_sync_nonce'] ) ) : '', 'd4h_calendar_sync_now' ) ) {
+				$this->run_sync_and_redirect();
+			}
+			return;
+		}
+	}
+
+	private function save_credentials(): void {
+		$opt_token = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$opt_ctx   = $this->config['option_context'] ?? 'd4h_calendar_api_context';
+		$opt_ctxid = $this->config['option_context_id'] ?? 'd4h_calendar_api_context_id';
+
+		$token = isset( $_POST['d4h_api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_token'] ) ) : '';
+		$ctx   = isset( $_POST['d4h_api_context'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context'] ) ) : '';
+		$ctxid = isset( $_POST['d4h_api_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context_id'] ) ) : '';
+
+		update_option( $opt_token, $token, false );
+		update_option( $opt_ctx, $ctx, false );
+		update_option( $opt_ctxid, $ctxid, false );
+
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	private function run_sync_and_redirect(): void {
+		$opt_token = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$token     = get_option( $opt_token, '' );
+
+		if ( $token === '' ) {
+			$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'error' => 'no_token' ), admin_url( 'options-general.php' ) );
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$api      = new API_Client( $this->config, $token );
+		$sync     = new Sync( $this->config, $api, $this->repository );
+		$result   = $sync->run_full_sync();
+
+		$query = array( 'page' => $this->config['admin_menu_slug'] );
+		if ( is_wp_error( $result ) ) {
+			$query['error'] = urlencode( $result->get_error_message() );
+		} else {
+			$query['synced'] = '1';
+		}
+		wp_safe_redirect( add_query_arg( $query, admin_url( 'options-general.php' ) ) );
+		exit;
 	}
 
 	/**
@@ -44,13 +129,71 @@ final class Admin {
 	}
 
 	/**
-	 * Renders the admin page (minimal in Step 1; credentials and sync controls in Step 3).
+	 * Renders the admin page: API credentials form, Sync now, Last updated.
 	 */
 	public function render_page(): void {
+		$opt_token  = $this->config['option_token'] ?? 'd4h_calendar_api_token';
+		$opt_ctx    = $this->config['option_context'] ?? 'd4h_calendar_api_context';
+		$opt_ctxid  = $this->config['option_context_id'] ?? 'd4h_calendar_api_context_id';
+		$opt_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
+
+		$token  = get_option( $opt_token, '' );
+		$ctx    = get_option( $opt_ctx, '' );
+		$ctxid  = get_option( $opt_ctxid, '' );
+		$updated = get_option( $opt_updated, 0 );
+
+		$page_title = esc_html( $this->config['admin_page_title'] ?? 'D4H Calendar' );
+
+		$saved  = isset( $_GET['saved'] ) && $_GET['saved'] === '1';
+		$synced = isset( $_GET['synced'] ) && $_GET['synced'] === '1';
+		$error  = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( $_GET['error'] ) ) : '';
+
 		?>
 		<div class="wrap">
-			<h1><?php echo esc_html( $this->config['admin_page_title'] ?? 'D4H Calendar' ); ?></h1>
-			<p><?php esc_html_e( 'Sync and calendar settings will appear here.', 'd4h-calendar' ); ?></p>
+			<h1><?php echo $page_title; ?></h1>
+
+			<?php if ( $saved ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'API credentials saved.', 'd4h-calendar' ); ?></p></div>
+			<?php endif; ?>
+			<?php if ( $synced ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Sync completed successfully.', 'd4h-calendar' ); ?></p></div>
+			<?php endif; ?>
+			<?php if ( $error ) : ?>
+				<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
+			<?php endif; ?>
+
+			<h2><?php esc_html_e( 'API credentials', 'd4h-calendar' ); ?></h2>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'd4h_calendar_save_credentials', 'd4h_calendar_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="save_credentials" />
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="d4h_api_token"><?php esc_html_e( 'API Token', 'd4h-calendar' ); ?></label></th>
+						<td><input type="password" id="d4h_api_token" name="d4h_api_token" value="<?php echo esc_attr( $token ); ?>" class="regular-text" autocomplete="off" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="d4h_api_context"><?php esc_html_e( 'team or organisation (optional)', 'd4h-calendar' ); ?></label></th>
+						<td><input type="text" id="d4h_api_context" name="d4h_api_context" value="<?php echo esc_attr( $ctx ); ?>" placeholder="team or organisation" class="regular-text" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="d4h_api_context_id"><?php esc_html_e( 'Team ID (optional)', 'd4h-calendar' ); ?></label></th>
+						<td><input type="text" id="d4h_api_context_id" name="d4h_api_context_id" value="<?php echo esc_attr( $ctxid ); ?>" class="regular-text" /></td>
+					</tr>
+				</table>
+				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save credentials', 'd4h-calendar' ); ?>" /></p>
+			</form>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Sync', 'd4h-calendar' ); ?></h2>
+			<p><strong><?php esc_html_e( 'Last updated:', 'd4h-calendar' ); ?></strong>
+				<?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?>
+			</p>
+			<form method="post" action="" style="display:inline;">
+				<?php wp_nonce_field( 'd4h_calendar_sync_now', 'd4h_calendar_sync_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="sync_now" />
+				<button type="submit" class="button button-secondary"><?php esc_html_e( 'Sync now', 'd4h-calendar' ); ?></button>
+			</form>
 		</div>
 		<?php
 	}

@@ -1,6 +1,6 @@
 <?php
 /**
- * Database: custom table name and schema (schema created in Step 2).
+ * Database: custom table schema and table name. Storage methods in Repository.
  *
  * @package D4H_Calendar
  */
@@ -32,11 +32,30 @@ final class Database {
 	}
 
 	/**
-	 * Create or update the activities table. Called on activation; schema defined in Step 2.
+	 * Create or update the activities table. Uses dbDelta.
 	 *
 	 * @return void
 	 */
 	public function maybe_create_tables(): void {
-		// Schema and dbDelta will be added in Step 2.
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		$table = $this->get_table_name();
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id varchar(64) NOT NULL,
+			resource_type varchar(32) NOT NULL,
+			starts_at datetime NOT NULL,
+			ends_at datetime DEFAULT NULL,
+			payload longtext,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id, resource_type),
+			KEY starts_at (starts_at),
+			KEY ends_at (ends_at)
+		) {$charset};";
+
+		dbDelta( $sql );
 	}
 }

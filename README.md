@@ -16,12 +16,15 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 2. **Configure**: Go to **Settings → D4H Calendar**, enter your D4H API token (and optionally context/contextId), save. Adjust other behaviour via `d4h-calendar/includes/config.php` if needed (cron interval, retention days, etc.).
 3. **Calendar**: Add shortcode `[d4h_calendar]` to any page or post to show the calendar.
 
-## Project structure (current – Step 1)
+## Project structure (current – Step 2)
 
 - `d4h-calendar/d4h-calendar.php` – Plugin header and bootstrap load.
 - `d4h-calendar/includes/config.php` – Single config array (no secrets).
-- `d4h-calendar/includes/class-d4h-loader.php` – Wires config, Database, Admin on `plugins_loaded`.
-- `d4h-calendar/includes/class-d4h-database.php` – Table name from config; schema in Step 2.
-- `d4h-calendar/includes/class-d4h-admin.php` – Registers **Settings → D4H Calendar** and minimal page.
+- `d4h-calendar/includes/class-d4h-loader.php` – Wires config, Database, Repository, Admin on `plugins_loaded`.
+- `d4h-calendar/includes/class-d4h-database.php` – Table schema (dbDelta) and table name from config.
+- `d4h-calendar/includes/class-d4h-api-client.php` – HTTP client for D4H API (whoami, get_events, get_exercises) with pagination.
+- `d4h-calendar/includes/class-d4h-repository.php` – Storage: replace_activities, get_activities, delete_older_than.
+- `d4h-calendar/includes/class-d4h-sync.php` – Sync orchestration: run_full_sync (fetch from API, store, update last_updated).
+- `d4h-calendar/includes/class-d4h-admin.php` – **Settings → D4H Calendar**: API credentials form, “Sync now” (POST), “Last updated” display.
 
-Further steps (see `.cursor/plans/`): API client + storage (Step 2), cron + admin AJAX (Step 3), frontend calendar + REST (Step 4), security and cleanup (Step 5).
+Further steps (see `.cursor/plans/`): cron + admin AJAX (Step 3), frontend calendar + REST (Step 4), security and cleanup (Step 5).

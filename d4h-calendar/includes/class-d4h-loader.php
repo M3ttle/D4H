@@ -17,6 +17,9 @@ final class Loader {
 	/** @var Database|null */
 	private $database;
 
+	/** @var Repository|null */
+	private $repository;
+
 	/** @var Admin|null */
 	private $admin;
 
@@ -30,8 +33,9 @@ final class Loader {
 	public function init(): void {
 		$this->config['table_name'] = $this->get_table_name();
 
-		$this->database = new Database( $this->config );
-		$this->admin    = new Admin( $this->config );
+		$this->database   = new Database( $this->config );
+		$this->repository = new Repository( $this->config, $this->database );
+		$this->admin      = new Admin( $this->config, $this->database, $this->repository );
 
 		$this->admin->register_hooks();
 	}
