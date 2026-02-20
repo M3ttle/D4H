@@ -57,7 +57,9 @@ function d4h_calendar_get_config() {
 		'rest_activities_route' => 'activities',
 
 		// FullCalendar defaults (Step 4)
-		'calendar_default_view' => 'dayGridMonth',
-		'calendar_date_range_days' => 90,
+		'calendar_default_view'   => 'dayGridMonth',
+		'calendar_date_range_days'=> 90,
+		'calendar_event_color'    => '#3788d8',
+		'calendar_exercise_color' => '#6c757d',
 	);
 }

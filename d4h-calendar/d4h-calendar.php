@@ -20,6 +20,8 @@ require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-api-client.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-repository.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-sync.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-cron.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-rest.php';
+require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-shortcode.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-admin.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-loader.php';
 

@@ -40,6 +40,12 @@ final class Loader {
 		$cron = new Cron( $this->config );
 		$cron->register_hooks();
 
+		$rest = new REST( $this->config, $this->repository );
+		add_action( 'rest_api_init', array( $rest, 'register_routes' ) );
+
+		$shortcode = new Shortcode( $this->config );
+		$shortcode->register_hooks();
+
 		$this->admin->register_hooks();
 	}
 
