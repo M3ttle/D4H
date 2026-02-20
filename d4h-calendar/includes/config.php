@@ -49,17 +49,19 @@ function d4h_calendar_get_config() {
 		'admin_page_title'   => 'D4H Calendar',
 		'admin_menu_title'   => 'D4H Calendar',
 
-		// Shortcode (Step 4)
+		// Shortcode
 		'shortcode_name'     => 'd4h_calendar',
 
-		// REST API (Step 4)
+		// REST API
 		'rest_namespace'     => 'd4h-calendar/v1',
 		'rest_activities_route' => 'activities',
 
-		// FullCalendar defaults (Step 4)
-		'calendar_default_view'   => 'dayGridMonth',
-		'calendar_date_range_days'=> 90,
-		'calendar_event_color'    => '#3788d8',
-		'calendar_exercise_color' => '#6c757d',
+		// FullCalendar defaults
+		'calendar_default_view'    => 'dayGridMonth',
+		'calendar_date_range_days' => 90,
+		'calendar_event_color'     => '#3788d8',
+		'calendar_exercise_color'  => '#6c757d',
+		'calendar_locale'          => 'is',
+		'calendar_content_height'  => 800,
 	);
 }

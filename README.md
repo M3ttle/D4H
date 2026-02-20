@@ -8,12 +8,12 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 
 - **Config**: Single config file (`d4h-calendar/includes/config.php`) for API base URL, cron interval, retention days, table/option names, shortcode, REST namespace, etc. API token and optional context/contextId are saved from the admin form to options.
 - **Admin**: Under **Settings → D4H Calendar**: API credentials form, “Last updated”, “Update now” (AJAX), “Delete data older than 90 days” (AJAX). Cron runs sync on a configurable interval.
-- **Frontend**: Shortcode `[d4h_calendar]` renders a FullCalendar fed by a REST endpoint that reads from the local activities table.
+- **Frontend**: Shortcode `[d4h_calendar]` renders a FullCalendar fed by a REST endpoint that reads from the local activities table. Uses Icelandic locale (`is`), header toolbar (month/week/day views), clickable days (switches to day view), event details modal on event click, and configurable height. See `config.php` for `calendar_locale`, `calendar_content_height`, etc.
 
 ## How to run / use
 
 1. **Install**: Copy the `d4h-calendar` folder into `wp-content/plugins/`. Activate the plugin in **Plugins**.
-2. **Configure**: Go to **Settings → D4H Calendar**, enter your D4H API token (and optionally context/contextId), save. Adjust other behaviour via `d4h-calendar/includes/config.php` if needed (cron interval, retention days, etc.).
+2. **Configure**: Go to **Settings → D4H Calendar**, enter your D4H API token (and optionally context/contextId), save. Adjust other behaviour via `d4h-calendar/includes/config.php` if needed (cron interval, retention days, `calendar_locale`, `calendar_content_height`, etc.).
 3. **Calendar**: Add shortcode `[d4h_calendar]` to any page or post to show the calendar.
 
 ## Project structure

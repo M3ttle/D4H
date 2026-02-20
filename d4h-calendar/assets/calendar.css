@@ -1,0 +1,103 @@
+/**
+ * D4H Calendar – frontend styles
+ *
+ * @package D4H_Calendar
+ */
+
+.d4h-calendar {
+	width: 100%;
+	min-width: 80%;
+	min-height: 800px;
+	font-size: 1rem;
+}
+
+.d4h-calendar .fc-toolbar-title {
+	font-size: 1.25em;
+}
+
+.d4h-calendar .fc-col-header-cell-cushion,
+.d4h-calendar .fc-daygrid-day-number {
+	font-size: 0.9em;
+}
+
+.d4h-calendar .fc-event-title,
+.d4h-calendar .fc-event-time {
+	font-size: 0.85em;
+}
+
+.d4h-calendar .fc-button {
+	font-size: 0.9em;
+}
+
+/* Event detail modal overlay */
+.d4h-calendar-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 100000;
+}
+
+.d4h-calendar-modal {
+	background: #fff;
+	border-radius: 8px;
+	max-width: 480px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+	padding: 1.5rem;
+}
+
+.d4h-calendar-modal h3 {
+	margin: 0 0 1rem;
+	font-size: 1.25rem;
+}
+
+.d4h-calendar-modal dl {
+	margin: 0;
+}
+
+.d4h-calendar-modal dt {
+	font-weight: 600;
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	color: #666;
+	margin-top: 1rem;
+	margin-bottom: 0.25rem;
+}
+
+.d4h-calendar-modal dt:first-of-type {
+	margin-top: 0;
+}
+
+.d4h-calendar-modal dd {
+	margin: 0;
+	line-height: 1.5;
+}
+
+.d4h-calendar-modal dd.d4h-calendar-modal-description {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.d4h-calendar-modal-close {
+	display: block;
+	margin-top: 1.5rem;
+	padding: 0.5rem 1rem;
+	background: #333;
+	color: #fff;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.875rem;
+}
+
+.d4h-calendar-modal-close:hover {
+	background: #555;
+}

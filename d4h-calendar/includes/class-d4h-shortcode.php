@@ -43,6 +43,7 @@ final class Shortcode {
 		$url   = $base . '/' . $route;
 
 		$fc_url = 'https://cdn.jsdelivr.net/npm/fullcalendar@' . self::FC_VERSION . '/index.global.min.js';
+		$fc_locales_url = 'https://cdn.jsdelivr.net/npm/@fullcalendar/core@' . self::FC_VERSION . '/locales-all.global.min.js';
 
 		wp_enqueue_script(
 			'fullcalendar',
@@ -51,20 +52,39 @@ final class Shortcode {
 			self::FC_VERSION,
 			true
 		);
+		wp_enqueue_script(
+			'fullcalendar-locales',
+			$fc_locales_url,
+			array( 'fullcalendar' ),
+			self::FC_VERSION,
+			true
+		);
 
-		$default_view = $this->config['calendar_default_view'] ?? 'dayGridMonth';
+		$calendar_css = plugin_dir_url( D4H_CALENDAR_PLUGIN_FILE ) . 'assets/calendar.css';
+		wp_enqueue_style(
+			'd4h-calendar-front',
+			$calendar_css,
+			array(),
+			D4H_CALENDAR_VERSION
+		);
+
+		$default_view   = $this->config['calendar_default_view'] ?? 'dayGridMonth';
+		$calendar_locale = $this->config['calendar_locale'] ?? 'is';
+		$content_height  = (int) ( $this->config['calendar_content_height'] ?? 700 );
 		$init_url     = plugin_dir_url( D4H_CALENDAR_PLUGIN_FILE ) . 'assets/calendar.js';
 
 		wp_enqueue_script(
 			'd4h-calendar-front',
 			$init_url,
-			array( 'fullcalendar' ),
+			array( 'fullcalendar', 'fullcalendar-locales' ),
 			D4H_CALENDAR_VERSION,
 			true
 		);
 		wp_localize_script( 'd4h-calendar-front', 'd4hCalendar', array(
-			'restUrl'     => $url,
-			'defaultView' => $default_view,
+			'restUrl'       => $url,
+			'defaultView'   => $default_view,
+			'locale'        => $calendar_locale,
+			'contentHeight' => $content_height,
 		) );
 	}
 

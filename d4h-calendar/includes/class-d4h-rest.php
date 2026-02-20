@@ -152,12 +152,22 @@ final class REST {
 
 			$color = ( $type === 'exercise' ) ? $exercise_color : $event_color;
 
+			$payload   = $activity['payload'] ?? array();
+			$desc      = isset( $payload['description'] ) ? (string) $payload['description'] : '';
+			$ref       = isset( $payload['reference'] ) ? (string) $payload['reference'] : '';
+			$ref_desc  = isset( $payload['referenceDescription'] ) ? (string) $payload['referenceDescription'] : '';
+
 			$event = array(
 				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,
 				'title'         => $title,
 				'start'         => $start,
 				'color'         => $color,
-				'extendedProps' => array( 'resourceType' => $type ),
+				'extendedProps' => array(
+					'resourceType'        => $type,
+					'description'         => $desc,
+					'reference'           => $ref,
+					'referenceDescription'=> $ref_desc,
+				),
 			);
 			if ( $end !== null && $end !== '' ) {
 				$event['end'] = $end;
