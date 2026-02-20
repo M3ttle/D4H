@@ -1,0 +1,30 @@
+---
+description: Always use human-readable variable and symbol names
+alwaysApply: true
+---
+
+# Human-Readable Variables
+
+Use clear, descriptive names for variables, functions, and other symbols.
+
+## Rules
+
+- Prefer full words over abbreviations (unless widely known: `id`, `url`, `max`)
+- Names should describe purpose or content, not type
+- Avoid single letters except for loop counters (`i`, `j`, `k`)
+
+## Examples
+
+```
+// ❌ BAD
+const d = new Date();
+const arr = getData();
+const x1 = user.age;
+const fn = () => {};
+
+// ✅ GOOD
+const today = new Date();
+const events = getData();
+const userAge = user.age;
+const handleSubmit = () => {};
+```
