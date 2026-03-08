@@ -34,6 +34,7 @@ $option_keys = array(
 	'option_event_color',
 	'option_exercise_color',
 	'option_tag_colors',
+	'option_tag_priority',
 	'option_calendar_content_height',
 	'option_cron_interval_sec',
 	'option_last_sync_error',

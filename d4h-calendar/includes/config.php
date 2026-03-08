@@ -28,6 +28,7 @@ function d4h_calendar_get_config() {
 		'option_event_color'   => 'd4h_calendar_event_color',
 		'option_exercise_color'=> 'd4h_calendar_exercise_color',
 		'option_tag_colors'   => 'd4h_calendar_tag_colors', // tag name => hex color
+		'option_tag_priority' => 'd4h_calendar_tag_priority', // ordered array of tag names (first = highest priority)
 		'option_calendar_content_height' => 'd4h_calendar_content_height',
 
 		// Cron

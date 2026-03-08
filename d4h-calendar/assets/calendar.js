@@ -5,7 +5,7 @@
 	var restUrl = cfg.restUrl || '';
 	var defaultView = cfg.defaultView || 'dayGridMonth';
 	var locale = cfg.locale || 'is';
-	var contentHeight = cfg.contentHeight != null ? cfg.contentHeight : 700;
+	var contentHeight = (cfg.contentHeight === 'auto' || cfg.contentHeight < 200) ? 'auto' : cfg.contentHeight;
 
 	function formatEventDate(d, allDay) {
 		d = toNativeDate(d);

@@ -4,11 +4,84 @@
  * @package D4H_Calendar
  */
 
-.d4h-calendar {
+ .d4h-calendar {
 	width: 100%;
-	min-width: 80%;
-	min-height: 800px;
+	max-width: 100%;
+	min-width: 0;
+	min-height: 1000px;
 	font-size: 1rem;
+	overflow-x: hidden;
+	overflow-y: visible;
+	box-sizing: border-box;
+}
+
+/* Contain calendar layout; prevent header/grid from overflowing */
+.d4h-calendar .fc-view-harness {
+	max-width: 100%;
+}
+
+.d4h-calendar .fc-scrollgrid {
+	width: 100% !important;
+}
+
+.d4h-calendar .fc-scroller {
+	overflow-x: auto;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* Header must not scroll vertically – prevents double scrollbar and narrow Sunday column */
+.d4h-calendar .fc-scrollgrid-shrink .fc-scroller,
+.d4h-calendar .fc-scrollgrid-section:first-child .fc-scroller,
+.d4h-calendar .fc-scrollgrid > *:first-child .fc-scroller {
+	overflow-y: hidden !important;
+}
+
+/* Prevent weekday header text from wrapping to extra line */
+.d4h-calendar .fc-col-header-cell-cushion {
+	white-space: nowrap;
+}
+
+/* Reduce padding to maximize content space and avoid overflow */
+.d4h-calendar .fc-scrollgrid td,
+.d4h-calendar .fc-scrollgrid th {
+	padding: 2px !important;
+}
+
+.d4h-calendar .fc-col-header-cell-cushion {
+	padding: 2px 4px !important;
+}
+
+.d4h-calendar .fc-daygrid-day-frame {
+	padding: 2px !important;
+	min-height: 0;
+}
+
+.d4h-calendar .fc-daygrid-day-events {
+	margin: 0 1px !important;
+}
+
+.d4h-calendar .fc-event {
+	margin: 1px 2px !important;
+	padding: 2px 4px !important;
+}
+
+.d4h-calendar .fc-daygrid-day-number {
+	padding: 2px 4px !important;
+}
+
+/* Remove gap between weekday header and first row of events */
+.d4h-calendar .fc-daygrid-day-top {
+	margin-bottom: 0 !important;
+	padding-bottom: 0 !important;
+}
+
+.d4h-calendar .fc-daygrid-day-events {
+	margin-top: 0 !important;
+}
+
+.d4h-calendar .fc-daygrid-day-bg {
+	min-height: 0 !important;
 }
 
 .d4h-calendar .fc-toolbar-title {
