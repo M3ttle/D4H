@@ -136,8 +136,21 @@ final class REST {
 	 * @return array<int, array{id: string, title: string, start: string, end?: string, color?: string, extendedProps: array{resourceType: string}}>
 	 */
 	private function to_fullcalendar_events( array $activities ): array {
-		$event_color    = $this->config['calendar_event_color'] ?? '#3788d8';
-		$exercise_color = $this->config['calendar_exercise_color'] ?? '#6c757d';
+		$option_event    = $this->config['option_event_color'] ?? 'd4h_calendar_event_color';
+		$option_exercise = $this->config['option_exercise_color'] ?? 'd4h_calendar_exercise_color';
+		$option_tag_colors = $this->config['option_tag_colors'] ?? 'd4h_calendar_tag_colors';
+
+		$event_color    = get_option( $option_event, '' );
+		$exercise_color = get_option( $option_exercise, '' );
+		if ( $event_color === '' ) {
+			$event_color = $this->config['calendar_event_color'] ?? '#3788d8';
+		}
+		if ( $exercise_color === '' ) {
+			$exercise_color = $this->config['calendar_exercise_color'] ?? '#6c757d';
+		}
+
+		$tag_colors_raw = get_option( $option_tag_colors, array() );
+		$tag_colors     = is_array( $tag_colors_raw ) ? $tag_colors_raw : array();
 
 		$events = array();
 		foreach ( $activities as $activity ) {
@@ -150,14 +163,26 @@ final class REST {
 				continue;
 			}
 
-			$color = ( $type === 'exercise' ) ? $exercise_color : $event_color;
-
 			$payload   = $activity['payload'] ?? array();
+			$tags_map  = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
+			$tags      = $this->extract_tags( $payload, is_array( $tags_map ) ? $tags_map : array() );
+
+			// Tag color has priority; first matching tag wins.
+			$color = null;
+			foreach ( $tags as $tag_name ) {
+				$tag_color = isset( $tag_colors[ $tag_name ] ) && is_string( $tag_colors[ $tag_name ] ) ? trim( $tag_colors[ $tag_name ] ) : '';
+				if ( $tag_color !== '' && preg_match( '/^#[0-9a-fA-F]{6}$/', $tag_color ) ) {
+					$color = $tag_color;
+					break;
+				}
+			}
+			if ( $color === null ) {
+				$color = ( $type === 'exercise' ) ? $exercise_color : $event_color;
+			}
+
 			$desc      = isset( $payload['description'] ) ? (string) $payload['description'] : '';
 			$ref       = isset( $payload['reference'] ) ? (string) $payload['reference'] : '';
 			$ref_desc  = isset( $payload['referenceDescription'] ) ? (string) $payload['referenceDescription'] : '';
-			$tags_map  = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
-			$tags      = $this->extract_tags( $payload, is_array( $tags_map ) ? $tags_map : array() );
 
 			$event = array(
 				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,

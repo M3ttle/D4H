@@ -70,6 +70,11 @@ final class Admin {
 				$this->save_sync_interval();
 			}
 		}
+		if ( $action === 'save_colors' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_colors' ) ) {
+				$this->save_colors();
+			}
+		}
 	}
 
 	/**
@@ -206,6 +211,41 @@ final class Admin {
 		exit;
 	}
 
+	private function save_colors(): void {
+		$option_event    = $this->config['option_event_color'] ?? 'd4h_calendar_event_color';
+		$option_exercise = $this->config['option_exercise_color'] ?? 'd4h_calendar_exercise_color';
+		$option_tag_colors = $this->config['option_tag_colors'] ?? 'd4h_calendar_tag_colors';
+
+		$event_color = isset( $_POST['d4h_event_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['d4h_event_color'] ) ) : '';
+		$exercise_color = isset( $_POST['d4h_exercise_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['d4h_exercise_color'] ) ) : '';
+
+		if ( $event_color ) {
+			update_option( $option_event, $event_color, false );
+		} else {
+			delete_option( $option_event );
+		}
+		if ( $exercise_color ) {
+			update_option( $option_exercise, $exercise_color, false );
+		} else {
+			delete_option( $option_exercise );
+		}
+
+		$tag_colors = array();
+		$raw_tags = isset( $_POST['d4h_tag_colors'] ) && is_array( $_POST['d4h_tag_colors'] ) ? $_POST['d4h_tag_colors'] : array();
+		foreach ( $raw_tags as $tag_name => $hex ) {
+			$name = sanitize_text_field( $tag_name );
+			$color = sanitize_hex_color( wp_unslash( $hex ) );
+			if ( $name !== '' && $color ) {
+				$tag_colors[ $name ] = $color;
+			}
+		}
+		update_option( $option_tag_colors, $tag_colors, false );
+
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
 	/**
 	 * Registers the admin menu and page.
 	 */
@@ -248,7 +288,7 @@ final class Admin {
 			<h1><?php echo $page_title; ?></h1>
 
 			<?php if ( $saved ) : ?>
-				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'API credentials saved.', 'd4h-calendar' ); ?></p></div>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'd4h-calendar' ); ?></p></div>
 			<?php endif; ?>
 			<?php if ( $error ) : ?>
 				<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
@@ -299,6 +339,71 @@ final class Admin {
 				<button type="submit" class="button button-secondary"><?php esc_attr_e( 'Save interval', 'd4h-calendar' ); ?></button>
 			</form>
 			<p class="description"><?php esc_html_e( 'How often the calendar syncs with D4H (when using cron).', 'd4h-calendar' ); ?></p>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Event colors', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_event_color   = $this->config['option_event_color'] ?? 'd4h_calendar_event_color';
+			$option_exercise_color= $this->config['option_exercise_color'] ?? 'd4h_calendar_exercise_color';
+			$option_tag_colors    = $this->config['option_tag_colors'] ?? 'd4h_calendar_tag_colors';
+			$event_color   = get_option( $option_event_color, $this->config['calendar_event_color'] ?? '#3788d8' );
+			$exercise_color= get_option( $option_exercise_color, $this->config['calendar_exercise_color'] ?? '#6c757d' );
+			$tag_colors    = get_option( $option_tag_colors, array() );
+			$tag_colors    = is_array( $tag_colors ) ? $tag_colors : array();
+			$tags_map      = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
+			$tags_map      = is_array( $tags_map ) ? $tags_map : array();
+			$synced_names  = array_values( array_filter( array_map( 'trim', $tags_map ) ) );
+			$tag_names     = array_values( array_unique( array_merge( $synced_names, array_keys( $tag_colors ) ) ) );
+			sort( $tag_names );
+			?>
+			<p class="description"><?php esc_html_e( 'Set colors by type (event/exercise) or by tag. Tag colors override type colors.', 'd4h-calendar' ); ?></p>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'd4h_calendar_save_colors', 'd4h_calendar_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="save_colors" />
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="d4h_event_color"><?php esc_html_e( 'Event', 'd4h-calendar' ); ?></label></th>
+						<td>
+							<input type="color" id="d4h_event_color" name="d4h_event_color" value="<?php echo esc_attr( $event_color ); ?>" />
+							<input type="text" class="small-text d4h-hex-input" value="<?php echo esc_attr( $event_color ); ?>" aria-label="<?php esc_attr_e( 'Event color hex', 'd4h-calendar' ); ?>" style="margin-left: 8px; width: 7em;" data-color-for="d4h_event_color" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="d4h_exercise_color"><?php esc_html_e( 'Exercise', 'd4h-calendar' ); ?></label></th>
+						<td>
+							<input type="color" id="d4h_exercise_color" name="d4h_exercise_color" value="<?php echo esc_attr( $exercise_color ); ?>" />
+							<input type="text" class="small-text d4h-hex-input" value="<?php echo esc_attr( $exercise_color ); ?>" aria-label="<?php esc_attr_e( 'Exercise color hex', 'd4h-calendar' ); ?>" style="margin-left: 8px; width: 7em;" data-color-for="d4h_exercise_color" />
+						</td>
+					</tr>
+					<?php if ( ! empty( $tag_names ) ) : ?>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'Tags', 'd4h-calendar' ); ?></th>
+							<td style="padding: 0;">
+								<style>.d4h-tags-colors-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 8px;padding:0;max-width:100%;margin-top:4px;}.d4h-tag-color-item{display:flex;align-items:center;gap:4px;min-width:0;padding:0;}.d4h-tag-color-item label{margin:0;padding:0;width:5em;min-width:5em;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;}.d4h-tag-color-item input[type="color"]{flex-shrink:0;width:28px;height:24px;}.d4h-tag-color-item .d4h-hex-input{width:5.5em;flex-shrink:0;min-width:0;}</style>
+								<div class="d4h-tags-colors-grid">
+									<?php foreach ( $tag_names as $tag_name ) : ?>
+										<?php
+										$current = isset( $tag_colors[ $tag_name ] ) ? $tag_colors[ $tag_name ] : '#3788d8';
+										$input_id = 'd4h_tag_color_' . sanitize_key( $tag_name );
+										?>
+										<div class="d4h-tag-color-item">
+											<label for="<?php echo esc_attr( $input_id ); ?>" title="<?php echo esc_attr( $tag_name ); ?>"><?php echo esc_html( $tag_name ); ?></label>
+											<input type="color" id="<?php echo esc_attr( $input_id ); ?>" name="d4h_tag_colors[<?php echo esc_attr( $tag_name ); ?>]" value="<?php echo esc_attr( $current ); ?>" />
+											<input type="text" class="small-text d4h-hex-input" value="<?php echo esc_attr( $current ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Color for tag %s', 'd4h-calendar' ), $tag_name ) ); ?>" data-color-for="<?php echo esc_attr( $input_id ); ?>" />
+										</div>
+									<?php endforeach; ?>
+								</div>
+							</td>
+						</tr>
+					<?php else : ?>
+						<tr>
+							<td colspan="2" class="description"><?php esc_html_e( 'No tags yet. Run "Update now" to sync tags from D4H.', 'd4h-calendar' ); ?></td>
+						</tr>
+					<?php endif; ?>
+				</table>
+				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save colors', 'd4h-calendar' ); ?>" /></p>
+			</form>
 
 			<hr />
 

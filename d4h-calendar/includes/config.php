@@ -25,6 +25,9 @@ function d4h_calendar_get_config() {
 		'option_context_id'  => 'd4h_calendar_api_org_id',
 		'option_last_updated'=> 'd4h_calendar_last_updated',
 		'option_tags_map'    => 'd4h_calendar_tags_map', // id => name for resolving tag IDs
+		'option_event_color'   => 'd4h_calendar_event_color',
+		'option_exercise_color'=> 'd4h_calendar_exercise_color',
+		'option_tag_colors'   => 'd4h_calendar_tag_colors', // tag name => hex color
 
 		// Cron
 		'cron_interval_sec'  => 7200, // 2 hours

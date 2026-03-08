@@ -71,6 +71,28 @@
 		});
 	}
 
+	// Sync color picker with hex text display (bidirectional)
+	document.querySelectorAll('input[type="color"]').forEach(function (picker) {
+		picker.addEventListener('input', function () {
+			var next = picker.nextElementSibling;
+			if (next && next.classList.contains('d4h-hex-input')) {
+				next.value = picker.value;
+			}
+		});
+	});
+	document.querySelectorAll('.d4h-hex-input').forEach(function (hexInput) {
+		hexInput.addEventListener('input', function () {
+			var pickerId = hexInput.getAttribute('data-color-for');
+			var picker = pickerId ? document.getElementById(pickerId) : hexInput.previousElementSibling;
+			if (!picker || picker.type !== 'color') return;
+			var val = (hexInput.value || '').trim();
+			if (/^#?[0-9a-fA-F]{6}$/.test(val)) {
+				val = val.charAt(0) === '#' ? val : '#' + val;
+				picker.value = val;
+			}
+		});
+	});
+
 	// Delete old data
 	var deleteBtn = document.getElementById('d4h-delete-old');
 	if (deleteBtn) {
