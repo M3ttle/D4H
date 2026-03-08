@@ -156,7 +156,8 @@ final class REST {
 			$desc      = isset( $payload['description'] ) ? (string) $payload['description'] : '';
 			$ref       = isset( $payload['reference'] ) ? (string) $payload['reference'] : '';
 			$ref_desc  = isset( $payload['referenceDescription'] ) ? (string) $payload['referenceDescription'] : '';
-			$tags      = $this->extract_tags( $payload );
+			$tags_map  = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
+			$tags      = $this->extract_tags( $payload, is_array( $tags_map ) ? $tags_map : array() );
 
 			$event = array(
 				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,
@@ -180,14 +181,16 @@ final class REST {
 	}
 
 	/**
-	 * Extract tag names from API payload. Supports multiple D4H structures:
+	 * Extract tag names from API payload. Supports:
+	 * - tags: [{id, resourceType}] – resolve id via $tags_map (D4H default)
 	 * - tags: [{name}, ...] or [string, ...]
 	 * - activityTags: [{tag: {name}}, ...] or [{name}, ...]
 	 *
 	 * @param array<string, mixed> $payload
+	 * @param array<int, string>   $tags_map id => name
 	 * @return array<int, string>
 	 */
-	private function extract_tags( array $payload ): array {
+	private function extract_tags( array $payload, array $tags_map = array() ): array {
 		$raw = $payload['tags'] ?? $payload['activityTags'] ?? array();
 		if ( ! is_array( $raw ) ) {
 			return array();
@@ -201,6 +204,11 @@ final class REST {
 				$name   = $tag_obj['name'] ?? $tag_obj['label'] ?? $tag_obj['title'] ?? '';
 				if ( is_string( $name ) && trim( $name ) !== '' ) {
 					$names[] = trim( $name );
+				} elseif ( isset( $tag_obj['id'] ) && ! empty( $tags_map ) ) {
+					$resolved = $tags_map[ (int) $tag_obj['id'] ] ?? null;
+					if ( is_string( $resolved ) && trim( $resolved ) !== '' ) {
+						$names[] = trim( $resolved );
+					}
 				}
 			}
 		}

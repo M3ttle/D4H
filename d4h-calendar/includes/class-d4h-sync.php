@@ -55,23 +55,24 @@ final class Sync {
 			return new \WP_Error( 'd4h_no_context', __( 'Could not determine API context. Set context and context ID in D4H Calendar settings.', 'd4h-calendar' ) );
 		}
 
-		$api_args = array();
-		if ( ! empty( $this->config['api_expand'] ) ) {
-			$api_args['expand'] = $this->config['api_expand'];
-		}
-
-		$events = $this->api->get_events( $context, $context_id, $api_args );
+		$events = $this->api->get_events( $context, $context_id );
 		if ( is_wp_error( $events ) ) {
 			return $events;
 		}
 
-		$exercises = $this->api->get_exercises( $context, $context_id, $api_args );
+		$exercises = $this->api->get_exercises( $context, $context_id );
 		if ( is_wp_error( $exercises ) ) {
 			return $exercises;
 		}
 
 		$items = $this->normalize_activities( $events, 'event' );
 		$items = array_merge( $items, $this->normalize_activities( $exercises, 'exercise' ) );
+
+		$tags = $this->api->get_tags( $context, $context_id );
+		if ( ! is_wp_error( $tags ) ) {
+			$tags_map = $this->build_tags_map( $tags );
+			update_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', $tags_map, false );
+		}
 
 		$result = $this->repository->replace_activities( $items );
 		if ( is_wp_error( $result ) ) {
@@ -109,5 +110,26 @@ final class Sync {
 			);
 		}
 		return $items;
+	}
+
+	/**
+	 * Build id => name map from tag objects.
+	 *
+	 * @param array<int, array<string, mixed>> $tags
+	 * @return array<int, string>
+	 */
+	private function build_tags_map( array $tags ): array {
+		$map = array();
+		foreach ( $tags as $tag ) {
+			$id = isset( $tag['id'] ) ? (int) $tag['id'] : null;
+			if ( $id === null ) {
+				continue;
+			}
+			$name = $tag['name'] ?? $tag['label'] ?? $tag['title'] ?? '';
+			if ( is_string( $name ) && trim( $name ) !== '' ) {
+				$map[ $id ] = trim( $name );
+			}
+		}
+		return $map;
 	}
 }
