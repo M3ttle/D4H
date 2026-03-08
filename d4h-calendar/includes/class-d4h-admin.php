@@ -34,16 +34,13 @@ final class Admin {
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu_page' ) );
 		add_action( 'admin_init', array( $this, 'handle_post' ) );
+		add_action( 'admin_init', array( $this, 'handle_check_updates' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
-		$action_sync        = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
-		$action_delete      = $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete';
-		$action_update      = $this->config['ajax_action_update'] ?? 'd4h_calendar_ajax_update';
-		$action_check_update= $this->config['ajax_action_check_update'] ?? 'd4h_calendar_ajax_check_update';
+		$action_sync   = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
+		$action_delete = $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete';
 		add_action( 'wp_ajax_' . $action_sync, array( $this, 'ajax_sync' ) );
 		add_action( 'wp_ajax_' . $action_delete, array( $this, 'ajax_delete' ) );
-		add_action( 'wp_ajax_' . $action_update, array( $this, 'ajax_update' ) );
-		add_action( 'wp_ajax_' . $action_check_update, array( $this, 'ajax_check_update' ) );
 	}
 
 	/**
@@ -82,6 +79,30 @@ final class Admin {
 	}
 
 	/**
+	 * Handles "Check for plugin updates" link: clears cached update data and redirects to Updates page.
+	 */
+	public function handle_check_updates(): void {
+		$slug = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
+		if ( isset( $_GET['page'] ) && sanitize_text_field( wp_unslash( $_GET['page'] ) ) !== $slug ) {
+			return;
+		}
+		if ( ! isset( $_GET['check_updates'] ) || $_GET['check_updates'] !== '1' ) {
+			return;
+		}
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '', 'd4h_check_updates' ) ) {
+			return;
+		}
+		delete_site_transient( 'update_plugins' );
+		wp_clean_plugins_cache( false );
+		wp_update_plugins();
+		wp_safe_redirect( admin_url( 'update-core.php' ) );
+		exit;
+	}
+
+	/**
 	 * Enqueue admin JS on our settings page only.
 	 *
 	 * @param string $hook
@@ -101,12 +122,10 @@ final class Admin {
 			true
 		);
 		wp_localize_script( 'd4h-calendar-admin', 'd4hCalendarAdmin', array(
-			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
-			'nonce'             => wp_create_nonce( 'd4h_calendar_admin' ),
-			'actionSync'        => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
-			'actionDelete'      => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
-			'actionUpdate'      => $this->config['ajax_action_update'] ?? 'd4h_calendar_ajax_update',
-			'actionCheckUpdate' => $this->config['ajax_action_check_update'] ?? 'd4h_calendar_ajax_check_update',
+			'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+			'nonce'        => wp_create_nonce( 'd4h_calendar_admin' ),
+			'actionSync'   => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
+			'actionDelete' => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
 		) );
 	}
 
@@ -175,102 +194,6 @@ final class Admin {
 		}
 
 		wp_send_json_success( array( 'deleted' => $result ) );
-	}
-
-	/**
-	 * AJAX handler: Check only — whether a plugin update is available. Does not perform update.
-	 */
-	public function ajax_check_update(): void {
-		check_ajax_referer( 'd4h_calendar_admin', 'nonce' );
-		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
-		}
-
-		$repo = $this->config['update_github_repo'] ?? '';
-		if ( $repo === '' ) {
-			wp_send_json_error( array( 'message' => __( 'Plugin update source not configured.', 'd4h-calendar' ) ), 400 );
-		}
-
-		$plugin_file     = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
-		$current_version = D4H_CALENDAR_VERSION;
-		$updater         = new Plugin_Updater( $this->config, $plugin_file, $current_version );
-		$check           = $updater->check_update();
-
-		$message = '';
-		if ( $check['available'] ) {
-			$message = sprintf(
-				/* translators: %s: available version number */
-				__( 'Update available: version %s.', 'd4h-calendar' ),
-				$check['latest']
-			);
-		} elseif ( $check['latest'] !== null ) {
-			$message = sprintf(
-				/* translators: 1: current version, 2: latest version */
-				__( 'Already on the latest version (%1$s).', 'd4h-calendar' ),
-				$current_version,
-				$check['latest']
-			);
-		} else {
-			$message = __( 'Could not fetch update info. Check your server can reach GitHub.', 'd4h-calendar' );
-		}
-
-		wp_send_json_success( array(
-			'available' => $check['available'],
-			'current'   => $check['current'],
-			'latest'    => $check['latest'],
-			'message'   => $message,
-		) );
-	}
-
-	/**
-	 * AJAX handler: Perform plugin update (download and install newer version).
-	 */
-	public function ajax_update(): void {
-		check_ajax_referer( 'd4h_calendar_admin', 'nonce' );
-		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
-		}
-
-		$repo = $this->config['update_github_repo'] ?? '';
-		if ( $repo === '' ) {
-			wp_send_json_error( array( 'message' => __( 'Plugin update source not configured.', 'd4h-calendar' ) ), 400 );
-		}
-
-		$plugin_file     = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
-		$current_version = D4H_CALENDAR_VERSION;
-		$updater         = new Plugin_Updater( $this->config, $plugin_file, $current_version );
-		$check           = $updater->check_update();
-
-		if ( ! $check['available'] ) {
-			$message = $check['latest'] !== null
-				? sprintf(
-					/* translators: 1: current version, 2: latest version */
-					__( 'Already on the latest version (%1$s).', 'd4h-calendar' ),
-					$current_version,
-					$check['latest']
-				)
-				: __( 'Could not fetch update info. Check your server can reach GitHub.', 'd4h-calendar' );
-			wp_send_json_error( array( 'message' => $message ), 200 );
-		}
-
-		$package = $check['package'];
-		if ( empty( $package ) ) {
-			wp_send_json_error( array( 'message' => __( 'No update package URL found in release.', 'd4h-calendar' ) ), 400 );
-		}
-
-		$result = $updater->do_upgrade( $package );
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
-		}
-
-		wp_send_json_success( array(
-			'message'       => sprintf(
-				/* translators: %s: new version number */
-				__( 'Plugin updated to version %s. Please refresh the page.', 'd4h-calendar' ),
-				$check['latest']
-			),
-			'new_version'   => $check['latest'],
-		) );
 	}
 
 	private function save_credentials(): void {
@@ -396,6 +319,80 @@ final class Admin {
 				<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
 			<?php endif; ?>
 
+			<h2><?php esc_html_e( 'Update', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
+			$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+			$last_status   = get_option( $option_status, '' );
+			$last_error    = get_option( $option_error, '' );
+			?>
+			<?php if ( $last_status === 'error' && $last_error ) : ?>
+				<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php echo esc_html( $last_error ); ?></p></div>
+			<?php elseif ( $last_status === 'success' ) : ?>
+				<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php esc_html_e( 'Success', 'd4h-calendar' ); ?></p>
+			<?php endif; ?>
+			<p><strong><?php esc_html_e( 'Last updated:', 'd4h-calendar' ); ?></strong>
+				<span id="d4h-last-updated"><?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?></span>
+			</p>
+			<p>
+				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Retrieve Calendar data', 'd4h-calendar' ); ?></button>
+				<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
+					<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'check_updates' => '1' ), admin_url( 'options-general.php' ) ), 'd4h_check_updates' ) ); ?>" class="button button-secondary"><?php esc_html_e( 'Check for plugin updates', 'd4h-calendar' ); ?></a>
+				<?php endif; ?>
+				<?php if ( ! empty( $this->config['enable_delete_btn'] ) ) : ?>
+					<?php $retention = (int) ( $this->config['retention_days'] ?? 90 ); ?>
+					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
+				<?php endif; ?>
+			</p>
+			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
+
+			<h3><?php esc_html_e( 'Sync history', 'd4h-calendar' ); ?></h3>
+			<?php
+			$sync_history = Sync_History::get_history( $this->config, 100 );
+			?>
+			<?php if ( empty( $sync_history ) ) : ?>
+				<p class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-calendar' ); ?></p>
+			<?php else : ?>
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th scope="col"><?php esc_html_e( 'Time', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Status', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Source', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Duration', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $sync_history as $entry ) : ?>
+							<?php
+							$time         = isset( $entry['time'] ) ? (int) $entry['time'] : 0;
+							$status       = isset( $entry['status'] ) ? $entry['status'] : '';
+							$source       = isset( $entry['source'] ) ? $entry['source'] : '';
+							$duration_sec = isset( $entry['duration_sec'] ) ? (float) $entry['duration_sec'] : null;
+							$error        = isset( $entry['error'] ) ? $entry['error'] : '';
+							?>
+							<tr>
+								<td><?php echo esc_html( $time ? wp_date( 'j M Y, H:i:s', $time ) : '—' ); ?></td>
+								<td>
+									<?php if ( $status === 'success' ) : ?>
+										<span style="color:#00a32a;"><?php esc_html_e( 'Success', 'd4h-calendar' ); ?></span>
+									<?php else : ?>
+										<span style="color:#d63638;"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></span>
+									<?php endif; ?>
+								</td>
+								<td><?php echo esc_html( $source === 'cron' ? __( 'Cron', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) ); ?></td>
+								<td><?php echo $duration_sec !== null ? esc_html( number_format( $duration_sec, 2 ) . ' s' ) : '—'; ?></td>
+								<td><?php echo $error ? esc_html( $error ) : '—'; ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p class="description"><?php esc_html_e( 'Latest 100 sync runs.', 'd4h-calendar' ); ?></p>
+			<?php endif; ?>
+
+			<hr />
+
 			<h2><?php esc_html_e( 'API credentials', 'd4h-calendar' ); ?></h2>
 			<form method="post" action="">
 				<?php wp_nonce_field( 'd4h_calendar_save_credentials', 'd4h_calendar_nonce' ); ?>
@@ -506,83 +503,6 @@ final class Admin {
 				</table>
 				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save colors', 'd4h-calendar' ); ?>" /></p>
 			</form>
-
-			<hr />
-
-			<h2><?php esc_html_e( 'Sync', 'd4h-calendar' ); ?></h2>
-			<?php
-			$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
-			$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
-			$last_status   = get_option( $option_status, '' );
-			$last_error    = get_option( $option_error, '' );
-			?>
-			<?php if ( $last_status === 'error' && $last_error ) : ?>
-				<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php echo esc_html( $last_error ); ?></p></div>
-			<?php elseif ( $last_status === 'success' ) : ?>
-				<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php esc_html_e( 'Success', 'd4h-calendar' ); ?></p>
-			<?php endif; ?>
-			<p><strong><?php esc_html_e( 'Last updated:', 'd4h-calendar' ); ?></strong>
-				<span id="d4h-last-updated"><?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?></span>
-			</p>
-			<p>
-				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Retrieve Calendar data', 'd4h-calendar' ); ?></button>
-				<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
-					<button type="button" id="d4h-plugin-check-update" class="button button-secondary"><?php esc_html_e( 'Check for plugin update', 'd4h-calendar' ); ?></button>
-					<button type="button" id="d4h-plugin-update-now" class="button button-primary" style="display:none;"><?php esc_html_e( 'Update plugin now', 'd4h-calendar' ); ?></button>
-				<?php endif; ?>
-				<?php if ( ! empty( $this->config['enable_delete_btn'] ) ) : ?>
-					<?php $retention = (int) ( $this->config['retention_days'] ?? 90 ); ?>
-					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
-				<?php endif; ?>
-			</p>
-			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
-
-			<hr />
-
-			<h2><?php esc_html_e( 'Sync history', 'd4h-calendar' ); ?></h2>
-			<?php
-			$sync_history = Sync_History::get_history( $this->config, 100 );
-			?>
-			<?php if ( empty( $sync_history ) ) : ?>
-				<p class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-calendar' ); ?></p>
-			<?php else : ?>
-				<table class="wp-list-table widefat fixed striped">
-					<thead>
-						<tr>
-							<th scope="col"><?php esc_html_e( 'Time', 'd4h-calendar' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Status', 'd4h-calendar' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Source', 'd4h-calendar' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Duration', 'd4h-calendar' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $sync_history as $entry ) : ?>
-							<?php
-							$time         = isset( $entry['time'] ) ? (int) $entry['time'] : 0;
-							$status       = isset( $entry['status'] ) ? $entry['status'] : '';
-							$source       = isset( $entry['source'] ) ? $entry['source'] : '';
-							$duration_sec = isset( $entry['duration_sec'] ) ? (float) $entry['duration_sec'] : null;
-							$error        = isset( $entry['error'] ) ? $entry['error'] : '';
-							?>
-							<tr>
-								<td><?php echo esc_html( $time ? wp_date( 'j M Y, H:i:s', $time ) : '—' ); ?></td>
-								<td>
-									<?php if ( $status === 'success' ) : ?>
-										<span style="color:#00a32a;"><?php esc_html_e( 'Success', 'd4h-calendar' ); ?></span>
-									<?php else : ?>
-										<span style="color:#d63638;"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></span>
-									<?php endif; ?>
-								</td>
-								<td><?php echo esc_html( $source === 'cron' ? __( 'Cron', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) ); ?></td>
-								<td><?php echo $duration_sec !== null ? esc_html( number_format( $duration_sec, 2 ) . ' s' ) : '—'; ?></td>
-								<td><?php echo $error ? esc_html( $error ) : '—'; ?></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-				<p class="description"><?php esc_html_e( 'Latest 100 sync runs.', 'd4h-calendar' ); ?></p>
-			<?php endif; ?>
 		</div>
 		<?php
 	}

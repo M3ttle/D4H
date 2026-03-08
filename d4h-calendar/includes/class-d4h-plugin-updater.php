@@ -141,12 +141,12 @@ final class Plugin_Updater {
 	 * @return true|\WP_Error
 	 */
 	public function do_upgrade( string $package_url ) {
-		if ( ! class_exists( 'Plugin_Upgrader' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/plugin.php';
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			require_once ABSPATH . 'wp-admin/includes/misc.php';
-			require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
-		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/misc.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		require_once ABSPATH . 'wp-admin/includes/class-plugin-upgrader.php';
+		require_once ABSPATH . 'wp-admin/includes/class-automatic-upgrader-skin.php';
 
 		$skin     = new \Automatic_Upgrader_Skin();
 		$upgrader = new \Plugin_Upgrader( $skin );
@@ -161,5 +161,136 @@ final class Plugin_Updater {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Registers a filter to inject our update into site_transient_update_plugins
+	 * when a newer version is available on GitHub. Uses the standard Plugins → Updates flow.
+	 *
+	 * @param array<string, mixed> $config
+	 */
+	public static function register_update_filter( array $config ): void {
+		add_filter( 'upgrader_pre_download', array( __CLASS__, 'filter_pre_download' ), 10, 3 );
+		add_filter( 'update_plugins_github.com', array( __CLASS__, 'filter_update_plugins_github' ), 10, 4 );
+
+		add_filter( 'site_transient_update_plugins', function ( $value ) use ( $config ) {
+			$repo = $config['update_github_repo'] ?? '';
+			if ( $repo === '' ) {
+				return $value;
+			}
+
+			$plugin_file     = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
+			$updater         = new self( $config, $plugin_file, D4H_CALENDAR_VERSION );
+			$check           = $updater->check_update();
+			if ( ! $check['available'] || empty( $check['package'] ) ) {
+				return $value;
+			}
+
+			$slug     = 'd4h-calendar';
+			$info_url = 'https://github.com/' . ltrim( $repo, '/' ) . '/releases';
+
+			if ( ! is_object( $value ) ) {
+				$value = new \stdClass();
+				$value->response = array();
+			}
+			if ( ! isset( $value->response ) || ! is_array( $value->response ) ) {
+				$value->response = array();
+			}
+
+			$value->response[ $plugin_file ] = (object) array(
+				'id'          => 'd4h-calendar/d4h-calendar.php',
+				'slug'        => $slug,
+				'plugin'      => $plugin_file,
+				'new_version' => $check['latest'],
+				'url'         => $info_url,
+				'package'     => $check['package'],
+			);
+
+			return $value;
+		} );
+	}
+
+	/**
+	 * Filter for update_plugins_github.com (Update URI hostname). Provides update info
+	 * so the plugin appears in Plugins → Updates and Dashboard → Updates.
+	 *
+	 * @param array|false $update      Update data or false.
+	 * @param array       $plugin_data Plugin header data.
+	 * @param string      $plugin_file Plugin file path (e.g. d4h-calendar/d4h-calendar.php).
+	 * @param string[]    $locales     Installed locales.
+	 * @return array|false
+	 */
+	public static function filter_update_plugins_github( $update, $plugin_data, $plugin_file, $locales ) {
+		if ( $plugin_file !== 'd4h-calendar/d4h-calendar.php' ) {
+			return $update;
+		}
+		$config = d4h_calendar_get_config();
+		$repo   = $config['update_github_repo'] ?? '';
+		if ( $repo === '' ) {
+			return $update;
+		}
+		$updater = new self( $config, $plugin_file, D4H_CALENDAR_VERSION );
+		$check   = $updater->check_update();
+		if ( ! $check['available'] || empty( $check['package'] ) ) {
+			return false;
+		}
+		return array(
+			'slug'    => 'd4h-calendar',
+			'plugin'  => $plugin_file,
+			'version' => $check['latest'],
+			'url'     => 'https://github.com/' . ltrim( $repo, '/' ) . '/releases',
+			'package' => $check['package'],
+		);
+	}
+
+	/**
+	 * Handles download of GitHub release assets so WordPress gets a valid ZIP.
+	 * GitHub may return HTML instead of the file when the User-Agent is missing or generic.
+	 *
+	 * @param bool|string $reply    False to use default download, or file path to use instead.
+	 * @param string      $package  Package URL.
+	 * @param \WP_Upgrader $upgrader Upgrader instance.
+	 * @return bool|string
+	 */
+	public static function filter_pre_download( $reply, $package, $upgrader ) {
+		if ( strpos( (string) $package, 'github.com' ) === false || strpos( (string) $package, '/releases/download/' ) === false ) {
+			return $reply;
+		}
+
+		$response = wp_remote_get( $package, array(
+			'timeout'     => 60,
+			'redirection' => 5,
+			'user-agent'  => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . get_bloginfo( 'url' ) . '; D4H-Calendar-Plugin',
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code !== 200 ) {
+			return new \WP_Error( 'download_failed', sprintf( __( 'Download failed with HTTP %d.', 'd4h-calendar' ), $code ) );
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		if ( empty( $body ) ) {
+			return new \WP_Error( 'download_failed', __( 'Empty response from GitHub.', 'd4h-calendar' ) );
+		}
+
+		$content_type = wp_remote_retrieve_header( $response, 'content-type' );
+		if ( $content_type && strpos( strtolower( $content_type ), 'text/html' ) !== false ) {
+			return new \WP_Error( 'download_failed', __( 'GitHub returned HTML instead of ZIP. Check release asset URL.', 'd4h-calendar' ) );
+		}
+
+		$tmp = wp_tempnam( 'd4h-calendar-' );
+		if ( ! $tmp ) {
+			return new \WP_Error( 'download_failed', __( 'Could not create temp file.', 'd4h-calendar' ) );
+		}
+		if ( file_put_contents( $tmp, $body ) === false ) {
+			@unlink( $tmp );
+			return new \WP_Error( 'download_failed', __( 'Could not write to temp file.', 'd4h-calendar' ) );
+		}
+
+		return $tmp;
 	}
 }

@@ -47,6 +47,8 @@ final class Loader {
 		$shortcode->register_hooks();
 
 		$this->admin->register_hooks();
+
+		Plugin_Updater::register_update_filter( $this->config );
 	}
 
 	private function get_table_name(): string {
