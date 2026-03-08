@@ -28,6 +28,7 @@ function d4h_calendar_get_config() {
 		'option_event_color'   => 'd4h_calendar_event_color',
 		'option_exercise_color'=> 'd4h_calendar_exercise_color',
 		'option_tag_colors'   => 'd4h_calendar_tag_colors', // tag name => hex color
+		'option_calendar_content_height' => 'd4h_calendar_content_height',
 
 		// Cron
 		'cron_interval_sec'  => 7200, // 2 hours
@@ -84,6 +85,6 @@ function d4h_calendar_get_config() {
 		'calendar_event_color'     => '#3788d8',
 		'calendar_exercise_color'  => '#6c757d',
 		'calendar_locale'          => 'is',
-		'calendar_content_height'  => 800,
+		'calendar_content_height'  => 600,
 	);
 }

@@ -81,6 +81,11 @@ final class Admin {
 				$this->save_github_token();
 			}
 		}
+		if ( $action === 'save_calendar_content_height' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_calendar_content_height' ) ) {
+				$this->save_calendar_content_height();
+			}
+		}
 	}
 
 	/**
@@ -249,6 +254,22 @@ final class Admin {
 		} else {
 			delete_option( $option_key );
 		}
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	private function save_calendar_content_height(): void {
+		$option_key  = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
+		$config_default = (int) ( $this->config['calendar_content_height'] ?? 600 );
+		$raw         = isset( $_POST['d4h_calendar_content_height'] ) ? (int) $_POST['d4h_calendar_content_height'] : 0;
+
+		if ( $raw >= 200 && $raw <= 2000 ) {
+			update_option( $option_key, $raw, false );
+		} else {
+			delete_option( $option_key );
+		}
+
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
 		wp_safe_redirect( $url );
 		exit;
@@ -477,6 +498,31 @@ final class Admin {
 				<button type="submit" class="button button-secondary"><?php esc_attr_e( 'Save interval', 'd4h-calendar' ); ?></button>
 			</form>
 			<p class="description"><?php esc_html_e( 'How often the calendar syncs with D4H (when using cron).', 'd4h-calendar' ); ?></p>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Calendar display', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_content_height  = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
+			$config_content_height  = (int) ( $this->config['calendar_content_height'] ?? 600 );
+			$current_content_height = (int) get_option( $option_content_height, 0 );
+			$effective_content_height = $current_content_height >= 200 ? $current_content_height : $config_content_height;
+			?>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'd4h_calendar_save_calendar_content_height', 'd4h_calendar_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="save_calendar_content_height" />
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="d4h_calendar_content_height"><?php esc_html_e( 'Content height (px)', 'd4h-calendar' ); ?></label></th>
+						<td>
+							<input type="number" id="d4h_calendar_content_height" name="d4h_calendar_content_height" value="<?php echo esc_attr( $effective_content_height ); ?>" min="0" max="2000" step="50" class="small-text" />
+							<span class="description"><?php echo esc_html( sprintf( __( '200–2000 px. Enter 0 to use config default (%d).', 'd4h-calendar' ), $config_content_height ) ); ?></span>
+						</td>
+					</tr>
+				</table>
+				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save', 'd4h-calendar' ); ?>" /></p>
+			</form>
+			<p class="description"><?php esc_html_e( 'Height of the calendar content area in pixels.', 'd4h-calendar' ); ?></p>
 
 			<hr />
 

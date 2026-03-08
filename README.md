@@ -7,7 +7,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 ## Quick start
 
 1. Copy `d4h-calendar` into `wp-content/plugins/` and activate in **Plugins**.
-2. Go to **Settings → D4H Calendar**, enter your D4H API token (and optional context/contextId), choose sync interval (1h, 2h, 6h, 12h, 24h), set event colors (by type or tag), then save.
+2. Go to **Settings → D4H Calendar**, enter your D4H API token (and optional context/contextId), choose sync interval (1h, 2h, 6h, 12h, 24h), set calendar content height and event colors (by type or tag), then save.
 3. Add shortcode `[d4h_calendar]` to any page or post.
 
 ---
@@ -15,9 +15,9 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 ## Features
 
 - **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
-- **Admin page**: API credentials, sync interval, event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), "Check for plugin update" and "Update plugin now" (when available) for self-update from GitHub, and “Delete data older than 90 days” (configurable retention).
+- **Admin page**: API credentials, sync interval, calendar content height (200–2000 px), event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), "Check for plugin update" and "Update plugin now" (when available) for self-update from GitHub, and “Delete data older than 90 days” (configurable retention).
 - **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set. Optional GitHub API token (admin or `D4H_CALENDAR_GITHUB_TOKEN` constant) increases rate limit from 60 to 5,000 requests/hour.
-- **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
+- **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height configurable via admin or `config.php`; locale via `config.php`.
 - **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output; API context validated (`team` or `organisation`) and context ID alphanumeric-only to prevent path injection.
 
 ---
