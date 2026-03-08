@@ -39,8 +39,8 @@ final class Sync {
 	 * @return true|\WP_Error
 	 */
 	public function run_full_sync( bool $sync_tags = false ) {
-		$context   = get_option( $this->config['option_context'] ?? 'd4h_calendar_api_org', '' );
-		$context_id = get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id', '' );
+		$context = function_exists( 'd4h_core_get_context' ) ? d4h_core_get_context() : get_option( $this->config['option_context'] ?? 'd4h_calendar_api_org', '' );
+		$context_id = function_exists( 'd4h_core_get_context_id' ) ? d4h_core_get_context_id() : get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id', '' );
 
 		if ( empty( $context ) || empty( $context_id ) ) {
 			$whoami = $this->api->whoami();

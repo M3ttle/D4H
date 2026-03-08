@@ -1,74 +1,153 @@
-# D4H Calendar WordPress Plugin
+# D4H WordPress Plugins
 
-WordPress plugin that fetches **events** and **exercises** from the D4H Team Manager API, stores them in a custom table, and displays them in a **public frontend calendar** (FullCalendar).
-
----
-
-## Quick start
-
-1. Copy `d4h-calendar` into `wp-content/plugins/` and activate in **Plugins**.
-2. Go to **Settings → D4H Calendar**, enter your D4H API token (and optional context/contextId), choose sync interval (1h, 2h, 6h, 12h, 24h), set calendar content height and event colors (by type or tag), then save.
-3. Add shortcode `[d4h_calendar]` to any page or post.
+WordPress plugins that integrate with the **D4H Team Manager API** for emergency management and incident reporting.
 
 ---
 
-## Features
+## Plugins Overview
 
-- **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
-- **Admin page**: API credentials, sync interval, calendar content height (200–2000 px), event colors (by type: event/exercise, or by tag; tag overrides type; drag tags to set priority when an event has multiple tags), custom CSS (text field for additional styles loaded after the plugin stylesheet), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), "Check for plugin update" and "Update plugin now" (when available) for self-update from GitHub, and “Delete data older than 90 days” (configurable retention).
-- **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set. Optional GitHub API token (admin or `D4H_CALENDAR_GITHUB_TOKEN` constant) increases rate limit from 60 to 5,000 requests/hour.
-- **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height configurable via admin or `config.php`; locale via `config.php`.
-- **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output; API context validated (`team` or `organisation`) and context ID alphanumeric-only to prevent path injection.
+| Plugin | Purpose |
+|--------|---------|
+| **D4H Core** | Shared API credentials, team/context, API logs, sync history. Parent admin menu. |
+| **D4H Calendar** | Fetches events and exercises, stores them, displays in a public FullCalendar |
+| **D4H Incidents** | Fetches incidents, shows statistics, charts, exports to Excel/CSV and PNG |
+
+When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents. Credentials, API logs, and sync history are stored centrally in Core. Calendar and Incidents read from Core and no longer show their own credential forms.
+
+Without Core, Calendar and Incidents add their pages under **Settings** and use their own credential options.
+
+### Recommended: Use D4H Core
+
+1. Copy `d4h-core`, `d4h-calendar`, and `d4h-incidents` into `wp-content/plugins/`.
+2. Activate **D4H Core** first, then Calendar and Incidents.
+3. Go to **D4H → Settings**, enter API token, context (team or organisation), and context ID.
+4. Use **D4H → Calendar** and **D4H → Incidents** for plugin-specific options.
 
 ---
 
-## Configuration
+## D4H Core
 
-All behaviour is controlled from `d4h-calendar/includes/config.php`:
+Stores **shared API credentials** (token, context, context ID), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar and Incidents use this data when Core is active.
+
+### Quick start
+
+1. Copy `d4h-core` into `wp-content/plugins/` and activate.
+2. Go to **D4H → Settings**, enter your D4H API token, context (team or organisation), and context ID.
+3. Activate Calendar and/or Incidents; they will appear under the D4H menu.
+
+### Project structure
+
+| File | Role |
+|------|------|
+| `d4h-core.php` | Plugin bootstrap |
+| `includes/config.php` | Config (no secrets) |
+| `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()` |
+| `includes/class-d4h-core-admin.php` | D4H menu, Settings page, credentials form |
+| `includes/class-d4h-core-logger.php` | API logs and sync history |
+| `uninstall.php` | Cleans up on uninstall |
+
+---
+
+## D4H Calendar
+
+Fetches **events** and **exercises** from the D4H Team Manager API, stores them in a custom table, and displays them in a **public frontend calendar** (FullCalendar).
+
+### Quick start
+
+1. Copy `d4h-calendar` into `wp-content/plugins/` and activate.
+2. With Core: go to **D4H → Calendar**. Without Core: go to **Settings → D4H Calendar**.
+3. Enter credentials (if no Core), choose sync interval, set calendar options.
+4. Add shortcode `[d4h_calendar]` to any page or post.
+
+### Features
+
+- **Sync**: Automatic sync via cron (configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
+- **Admin page**: API credentials, sync interval, calendar content height (200–2000 px), event colors (by type or tag), custom CSS, sync history.
+- **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set.
+- **Calendar**: FullCalendar with month/week/day views, event details modal.
+
+### Configuration
+
+`d4h-calendar/includes/config.php`:
 
 - API base URL, cron interval, retention days
-- `update_github_repo`: GitHub repo for self-update via Plugins → Updates (e.g. `owner/repo`); empty to disable
-- GitHub API token: optional, in admin **Settings → D4H Calendar** or via `define( 'D4H_CALENDAR_GITHUB_TOKEN', 'ghp_...' );` in `wp-config.php` to avoid API rate limits (60→5,000 requests/hour)
-- Table/option names, shortcode, REST namespace
-- `calendar_locale`, `calendar_content_height`, `cron_lock_ttl_sec`, etc.
+- `update_github_repo`: GitHub repo for self-update
+- `calendar_locale`, `calendar_content_height`, etc.
 
-The API token and optional context/contextId are saved from the admin form (never in config or repo).
-
----
-
-## Project structure
+### Project structure
 
 | File | Role |
 |------|------|
 | `d4h-calendar.php` | Plugin bootstrap |
-| `includes/config.php` | Single config array (no secrets) |
-| `includes/class-d4h-loader.php` | Wires components on `plugins_loaded` |
-| `includes/class-d4h-database.php` | Table schema (dbDelta) |
-| `includes/class-d4h-api-client.php` | D4H API client (events, exercises, pagination) |
-| `includes/class-d4h-repository.php` | Storage: replace, get, delete older than |
-| `includes/class-d4h-sync.php` | Sync: fetch from API, store, update last_updated |
-| `includes/class-d4h-sync-history.php` | Sync history: log and retrieve last 100 runs |
-| `includes/class-d4h-cron.php` | Cron: custom interval, overlap lock, reschedule on change |
-| `includes/class-d4h-rest.php` | REST `GET /wp-json/d4h-calendar/v1/activities` |
-| `includes/class-d4h-shortcode.php` | Shortcode `[d4h_calendar]` and FullCalendar init |
-| `includes/class-d4h-admin.php` | Settings page and AJAX actions |
-| `includes/class-d4h-plugin-updater.php` | Self-update from GitHub releases |
-| `admin/admin.js` | Admin AJAX (Retrieve Calendar data, plugin update, Delete older) |
-| `assets/calendar.js` | Frontend FullCalendar init |
-| `uninstall.php` | On uninstall: clears scheduled cron, deletes all plugin options, drops the custom table |
+| `includes/config.php` | Config (no secrets) |
+| `includes/class-d4h-api-client.php` | D4H API client (events, exercises) |
+| `includes/class-d4h-sync.php` | Sync orchestration |
+| `includes/class-d4h-rest.php` | REST activities endpoint |
+| `includes/class-d4h-shortcode.php` | Shortcode and FullCalendar |
+| `includes/class-d4h-admin.php` | Settings page |
+| `uninstall.php` | Cleans up on uninstall |
 
 ---
 
-## Cron behaviour
+## D4H Incidents
 
-- **WP Cron**: Sync runs on WordPress pseudo-cron. Events run when someone visits the site; timing is approximate.
-- **Overlap protection**: A transient lock prevents multiple syncs running at once. TTL configurable via `cron_lock_ttl_sec` in `config.php` (default 15 min).
-- **Reschedule on change**: When `cron_interval_sec`, `cron_schedule_name`, or the admin sync interval changes, the schedule updates on the next page load; no reactivation needed.
+Fetches **incidents** from the D4H Team Manager API and displays **statistics**, **charts**, and **exports** (Excel/CSV, PNG).
 
-### More reliable scheduling (low-traffic sites)
+### Quick start
 
-1. Add `define( 'DISABLE_WP_CRON', true );` to `wp-config.php`
-2. Add a system cron job:  
-   `*/15 * * * * cd /path/to/wordpress && wp cron event run --due-now`
+1. Copy `d4h-incidents` into `wp-content/plugins/` and activate.
+2. With Core: go to **D4H → Incidents**. Without Core: go to **Settings → D4H Incidents**.
+3. Enter credentials (if no Core). Select a time period (days, months, or 1 year), click **Fetch data**, then view statistics and charts.
+4. Export to Excel (CSV) or download chart images (PNG).
 
-See [WordPress Cron](https://developer.wordpress.org/plugins/cron/) for details.
+### Features
+
+- **Time range selector**: 7 days, 30 days, 90 days, 1 year presets or custom date range.
+- **Statistics**: Total incidents, total participants, incident types breakdown.
+- **Charts**:  
+  - Incident types (doughnut)  
+  - Participants by incident count (horizontal bar, top 30)  
+  - Incidents and participants by month and hour (bar)
+- **Exports**: Excel (CSV) for raw data; PNG for each chart.
+- **API**: Uses same D4H API base URL and credentials as Calendar; can reuse D4H Calendar credentials if both plugins are active.
+
+### Configuration
+
+`d4h-incidents/includes/config.php`:
+
+- API base URL
+- `default_range_days`: default time range (365)
+- `update_github_repo`: GitHub repo for self-update
+
+### Project structure
+
+| File | Role |
+|------|------|
+| `d4h-incidents.php` | Plugin bootstrap |
+| `includes/config.php` | Config (no secrets) |
+| `includes/class-d4h-incidents-api-client.php` | D4H API client (incidents, attendance) |
+| `includes/class-d4h-incidents-admin.php` | Admin page, fetch, charts, export |
+| `includes/class-d4h-incidents-plugin-updater.php` | Self-update from GitHub |
+| `admin/admin.js` | Fetch, Chart.js, export handlers |
+| `assets/admin.css` | Admin styles |
+| `uninstall.php` | Cleans up on uninstall |
+
+---
+
+## Shared
+
+- **D4H Core**: When active, provides API credentials, API logs, sync history, and the D4H admin menu.
+- **API**: All plugins use the D4H Team Manager API v3 (HTTPS, Bearer token).
+- **Credentials**: Stored in Core (or per-plugin if Core is not active).
+- **Updates**: Core, Calendar, and Incidents support self-update from GitHub (M3ttle/D4H).
+- **Security**: API credentials in options; nonces and capability checks on admin/AJAX.
+
+---
+
+## Author
+
+Nonni
+
+## License
+
+GPL v2 or later

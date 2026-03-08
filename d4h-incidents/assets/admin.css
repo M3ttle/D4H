@@ -1,0 +1,59 @@
+.d4h-incidents-wrap h2 {
+	margin-top: 1.5em;
+}
+.d4h-incidents-wrap h2:first-child {
+	margin-top: 0;
+}
+.d4h-incidents-fetch-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 1em;
+}
+.d4h-incidents-fetch-form label {
+	margin-right: 4px;
+}
+.d4h-incidents-fetch-form #d4h-incidents-presets {
+	margin-left: 10px;
+}
+.d4h-incidents-stats-cards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1em;
+	margin: 1em 0;
+}
+.d4h-stat-card {
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 1em 1.5em;
+	min-width: 140px;
+	text-align: center;
+}
+.d4h-stat-card .d4h-stat-value {
+	display: block;
+	font-size: 1.8em;
+	font-weight: 600;
+	color: #1d2327;
+}
+.d4h-stat-card .d4h-stat-label {
+	display: block;
+	font-size: 0.9em;
+	color: #646970;
+}
+.d4h-chart-container {
+	position: relative;
+	max-width: 700px;
+	height: 350px;
+	margin: 1em 0;
+}
+.d4h-chart-container canvas {
+	max-height: 350px;
+}
+.d4h-chart-container .d4h-export-png {
+	margin-top: 0.5em;
+}
+.d4h-incidents-export {
+	margin: 2em 0;
+}

@@ -100,7 +100,7 @@ final class Cron {
 			return;
 		}
 
-		$token = get_option( $this->config['option_token'] ?? 'd4h_calendar_api_token', '' );
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : get_option( $this->config['option_token'] ?? 'd4h_calendar_api_token', '' );
 		if ( $token === '' ) {
 			return;
 		}
@@ -132,7 +132,7 @@ final class Cron {
 				$error_message = $result->get_error_message();
 				update_option( $option_error, $error_message, false );
 				update_option( $option_status, 'error', false );
-				Sync_History::log_sync( $this->config, 'error', $error_message, 'cron', $duration );
+				Sync_History::log_sync( $this->config, 'error', $error_message, 'cron', $duration, null, 'calendar' );
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 					error_log( 'D4H Calendar cron sync failed: ' . $error_message );
@@ -140,14 +140,14 @@ final class Cron {
 			} else {
 				delete_option( $option_error );
 				update_option( $option_status, 'success', false );
-				Sync_History::log_sync( $this->config, 'success', '', 'cron', $duration );
+				Sync_History::log_sync( $this->config, 'success', '', 'cron', $duration, null, 'calendar' );
 			}
 		} catch ( \Throwable $exception ) {
 			$duration = microtime( true ) - $start;
 			$message  = $exception->getMessage();
 			update_option( $option_error, $message, false );
 			update_option( $option_status, 'error', false );
-			Sync_History::log_sync( $this->config, 'error', $message, 'cron', $duration );
+			Sync_History::log_sync( $this->config, 'error', $message, 'cron', $duration, null, 'calendar' );
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 				error_log( 'D4H Calendar cron sync exception: ' . $message );
