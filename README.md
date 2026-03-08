@@ -16,6 +16,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 
 - **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
 - **Admin page**: API credentials, sync interval, event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), "Check for plugin update" and "Update plugin now" (when available) for self-update from GitHub, and “Delete data older than 90 days” (configurable retention).
+- **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set.
 - **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
 - **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output; API context validated (`team` or `organisation`) and context ID alphanumeric-only to prevent path injection.
 
@@ -26,7 +27,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 All behaviour is controlled from `d4h-calendar/includes/config.php`:
 
 - API base URL, cron interval, retention days
-- `update_github_repo`: GitHub repo for self-update (e.g. `owner/repo`); empty to disable the update button
+- `update_github_repo`: GitHub repo for self-update via Plugins → Updates (e.g. `owner/repo`); empty to disable
 - Table/option names, shortcode, REST namespace
 - `calendar_locale`, `calendar_content_height`, `cron_lock_ttl_sec`, etc.
 

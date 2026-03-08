@@ -58,12 +58,10 @@ function d4h_calendar_get_config() {
 		'enable_delete_btn'  => false,
 
 		// AJAX actions (admin-only)
-		'ajax_action_sync'        => 'd4h_calendar_ajax_sync',
-		'ajax_action_delete'      => 'd4h_calendar_ajax_delete',
-		'ajax_action_update'      => 'd4h_calendar_ajax_update',
-		'ajax_action_check_update'=> 'd4h_calendar_ajax_check_update',
+		'ajax_action_sync'   => 'd4h_calendar_ajax_sync',
+		'ajax_action_delete' => 'd4h_calendar_ajax_delete',
 
-		// Self-update from GitHub releases (owner/repo; empty to disable)
+		// Self-update from GitHub releases via Plugins → Updates (owner/repo; empty to disable)
 		'update_github_repo' => 'M3ttle/D4H',
 
 		// Admin

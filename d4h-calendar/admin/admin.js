@@ -6,8 +6,6 @@
 	var nonce = cfg.nonce || '';
 	var actionSync = cfg.actionSync || 'd4h_calendar_ajax_sync';
 	var actionDelete = cfg.actionDelete || 'd4h_calendar_ajax_delete';
-	var actionUpdate = cfg.actionUpdate || 'd4h_calendar_ajax_update';
-	var actionCheckUpdate = cfg.actionCheckUpdate || 'd4h_calendar_ajax_check_update';
 
 	function showMessage(text, type) {
 		var el = document.getElementById('d4h-admin-message');
@@ -38,76 +36,6 @@
 		} else if (btn.dataset.originalText) {
 			btn.textContent = btn.dataset.originalText;
 		}
-	}
-
-	// Check for plugin update (check only)
-	var pluginCheckBtn = document.getElementById('d4h-plugin-check-update');
-	var pluginUpdateNowBtn = document.getElementById('d4h-plugin-update-now');
-	if (pluginCheckBtn) {
-		pluginCheckBtn.addEventListener('click', function () {
-			hideMessage();
-			if (pluginUpdateNowBtn) pluginUpdateNowBtn.style.display = 'none';
-			setButtonLoading('d4h-plugin-check-update', true);
-
-			var formData = new FormData();
-			formData.append('action', actionCheckUpdate);
-			formData.append('nonce', nonce);
-
-			fetch(ajaxUrl, {
-				method: 'POST',
-				body: formData,
-				credentials: 'same-origin'
-			})
-				.then(function (r) { return r.json(); })
-				.then(function (data) {
-					var msg = data.data && data.data.message ? data.data.message : 'Check complete.';
-					showMessage(msg, 'info');
-					if (data.success && data.data && data.data.available && pluginUpdateNowBtn) {
-						pluginUpdateNowBtn.style.display = 'inline-block';
-					}
-					var msgEl = document.getElementById('d4h-admin-message');
-					if (msgEl) msgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-				})
-				.catch(function () {
-					showMessage('Request failed.', 'error');
-				})
-				.finally(function () {
-					setButtonLoading('d4h-plugin-check-update', false);
-				});
-		});
-	}
-
-	// Update plugin now (only shown when update is available)
-	if (pluginUpdateNowBtn) {
-		pluginUpdateNowBtn.addEventListener('click', function () {
-			hideMessage();
-			setButtonLoading('d4h-plugin-update-now', true);
-
-			var formData = new FormData();
-			formData.append('action', actionUpdate);
-			formData.append('nonce', nonce);
-
-			fetch(ajaxUrl, {
-				method: 'POST',
-				body: formData,
-				credentials: 'same-origin'
-			})
-				.then(function (r) { return r.json(); })
-				.then(function (data) {
-					var msg = data.data && data.data.message ? data.data.message : (data.success ? 'Plugin updated.' : 'Update failed.');
-					showMessage(msg, data.success ? 'success' : 'error');
-					if (data.success && data.data && data.data.new_version) {
-						if (pluginUpdateNowBtn) pluginUpdateNowBtn.style.display = 'none';
-						setTimeout(function () { window.location.reload(); }, 2000);
-					}
-				})
-				.catch(function () {
-					showMessage('Request failed.', 'error');
-				})
-				.finally(function () {
-					setButtonLoading('d4h-plugin-update-now', false);
-				});
-		});
 	}
 
 	// Retrieve Calendar data (sync)
