@@ -172,6 +172,7 @@ final class Plugin_Updater {
 	public static function register_update_filter( array $config ): void {
 		add_filter( 'upgrader_pre_download', array( __CLASS__, 'filter_pre_download' ), 10, 3 );
 		add_filter( 'update_plugins_github.com', array( __CLASS__, 'filter_update_plugins_github' ), 10, 4 );
+		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'filter_pre_set_update_plugins' ), 10, 1 );
 
 		add_filter( 'site_transient_update_plugins', function ( $value ) use ( $config ) {
 			$repo = $config['update_github_repo'] ?? '';
@@ -208,6 +209,45 @@ final class Plugin_Updater {
 
 			return $value;
 		} );
+	}
+
+	/**
+	 * Injects our update when the transient is saved (e.g. after wp_update_plugins).
+	 * Ensures our plugin appears even if update_plugins_github.com is not invoked.
+	 *
+	 * @param object $value Update plugins transient value.
+	 * @return object
+	 */
+	public static function filter_pre_set_update_plugins( $value ) {
+		if ( $value === null ) {
+			$value = new \stdClass();
+		}
+		$config = d4h_calendar_get_config();
+		$repo   = $config['update_github_repo'] ?? '';
+		if ( $repo === '' ) {
+			return $value;
+		}
+		$plugin_file = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
+		$updater     = new self( $config, $plugin_file, D4H_CALENDAR_VERSION );
+		$check       = $updater->check_update();
+		if ( ! $check['available'] || empty( $check['package'] ) ) {
+			return $value;
+		}
+		if ( ! is_object( $value ) ) {
+			$value = new \stdClass();
+		}
+		if ( ! isset( $value->response ) || ! is_array( $value->response ) ) {
+			$value->response = array();
+		}
+		$value->response[ $plugin_file ] = (object) array(
+			'id'          => 'd4h-calendar/d4h-calendar.php',
+			'slug'        => 'd4h-calendar',
+			'plugin'      => $plugin_file,
+			'new_version' => $check['latest'],
+			'url'         => 'https://github.com/' . ltrim( $repo, '/' ) . '/releases',
+			'package'     => $check['package'],
+		);
+		return $value;
 	}
 
 	/**
