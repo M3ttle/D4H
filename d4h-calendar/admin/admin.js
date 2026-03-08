@@ -88,6 +88,15 @@
 		});
 	}
 
+	// Sortable tag priority (order determines which tag color wins for events with multiple tags)
+	var tagsSortable = document.getElementById('d4h-tags-sortable');
+	if (tagsSortable && typeof jQuery !== 'undefined' && jQuery.fn.sortable) {
+		jQuery('#d4h-tags-sortable').sortable({
+			handle: '.d4h-drag-handle',
+			placeholder: 'ui-sortable-placeholder'
+		});
+	}
+
 	// Sync color picker with hex text display (bidirectional)
 	document.querySelectorAll('input[type="color"]').forEach(function (picker) {
 		picker.addEventListener('input', function () {

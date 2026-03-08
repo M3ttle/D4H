@@ -149,8 +149,11 @@ final class REST {
 			$exercise_color = $this->config['calendar_exercise_color'] ?? '#6c757d';
 		}
 
-		$tag_colors_raw = get_option( $option_tag_colors, array() );
-		$tag_colors     = is_array( $tag_colors_raw ) ? $tag_colors_raw : array();
+		$option_tag_priority = $this->config['option_tag_priority'] ?? 'd4h_calendar_tag_priority';
+		$tag_colors_raw      = get_option( $option_tag_colors, array() );
+		$tag_colors          = is_array( $tag_colors_raw ) ? $tag_colors_raw : array();
+		$tag_priority_raw    = get_option( $option_tag_priority, array() );
+		$tag_priority        = is_array( $tag_priority_raw ) ? $tag_priority_raw : array();
 
 		$events = array();
 		foreach ( $activities as $activity ) {
@@ -166,6 +169,16 @@ final class REST {
 			$payload   = $activity['payload'] ?? array();
 			$tags_map  = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
 			$tags      = $this->extract_tags( $payload, is_array( $tags_map ) ? $tags_map : array() );
+
+			// Sort tags by admin-defined priority so first matching tag wins.
+			if ( ! empty( $tag_priority ) ) {
+				$priority_lookup = array_flip( array_values( $tag_priority ) );
+				usort( $tags, function ( $tag_a, $tag_b ) use ( $priority_lookup ) {
+					$index_a = isset( $priority_lookup[ $tag_a ] ) ? $priority_lookup[ $tag_a ] : 9999;
+					$index_b = isset( $priority_lookup[ $tag_b ] ) ? $priority_lookup[ $tag_b ] : 9999;
+					return $index_a - $index_b;
+				} );
+			}
 
 			// Tag color has priority; first matching tag wins.
 			$color = null;

@@ -123,11 +123,12 @@ final class Admin {
 			return;
 		}
 
+		wp_enqueue_script( 'jquery-ui-sortable' );
 		$url = plugin_dir_url( D4H_CALENDAR_PLUGIN_FILE ) . 'admin/admin.js';
 		wp_enqueue_script(
 			'd4h-calendar-admin',
 			$url,
-			array( 'jquery' ),
+			array( 'jquery', 'jquery-ui-sortable' ),
 			D4H_CALENDAR_VERSION,
 			true
 		);
@@ -294,16 +295,20 @@ final class Admin {
 			delete_option( $option_exercise );
 		}
 
-		$tag_colors = array();
-		$raw_tags = isset( $_POST['d4h_tag_colors'] ) && is_array( $_POST['d4h_tag_colors'] ) ? $_POST['d4h_tag_colors'] : array();
+		$tag_colors   = array();
+		$tag_priority = array();
+		$option_tag_priority = $this->config['option_tag_priority'] ?? 'd4h_calendar_tag_priority';
+		$raw_tags     = isset( $_POST['d4h_tag_colors'] ) && is_array( $_POST['d4h_tag_colors'] ) ? $_POST['d4h_tag_colors'] : array();
 		foreach ( $raw_tags as $tag_name => $hex ) {
-			$name = sanitize_text_field( $tag_name );
+			$name  = sanitize_text_field( $tag_name );
 			$color = sanitize_hex_color( wp_unslash( $hex ) );
 			if ( $name !== '' && $color ) {
 				$tag_colors[ $name ] = $color;
+				$tag_priority[]      = $name;
 			}
 		}
 		update_option( $option_tag_colors, $tag_colors, false );
+		update_option( $option_tag_priority, $tag_priority, false );
 
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
 		wp_safe_redirect( $url );
@@ -531,17 +536,29 @@ final class Admin {
 			$option_event_color   = $this->config['option_event_color'] ?? 'd4h_calendar_event_color';
 			$option_exercise_color= $this->config['option_exercise_color'] ?? 'd4h_calendar_exercise_color';
 			$option_tag_colors    = $this->config['option_tag_colors'] ?? 'd4h_calendar_tag_colors';
+			$option_tag_priority  = $this->config['option_tag_priority'] ?? 'd4h_calendar_tag_priority';
 			$event_color   = get_option( $option_event_color, $this->config['calendar_event_color'] ?? '#3788d8' );
 			$exercise_color= get_option( $option_exercise_color, $this->config['calendar_exercise_color'] ?? '#6c757d' );
 			$tag_colors    = get_option( $option_tag_colors, array() );
 			$tag_colors    = is_array( $tag_colors ) ? $tag_colors : array();
+			$tag_priority  = get_option( $option_tag_priority, array() );
+			$tag_priority  = is_array( $tag_priority ) ? $tag_priority : array();
 			$tags_map      = get_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', array() );
 			$tags_map      = is_array( $tags_map ) ? $tags_map : array();
 			$synced_names  = array_values( array_filter( array_map( 'trim', $tags_map ) ) );
-			$tag_names     = array_values( array_unique( array_merge( $synced_names, array_keys( $tag_colors ) ) ) );
-			sort( $tag_names );
+			$all_tag_names = array_values( array_unique( array_merge( $synced_names, array_keys( $tag_colors ) ) ) );
+			// Order: priority list first (preserving order), then new tags alphabetically.
+			$tag_names = array();
+			foreach ( $tag_priority as $name ) {
+				if ( in_array( $name, $all_tag_names, true ) ) {
+					$tag_names[] = $name;
+				}
+			}
+			$remaining = array_diff( $all_tag_names, $tag_names );
+			sort( $remaining );
+			$tag_names = array_merge( $tag_names, $remaining );
 			?>
-			<p class="description"><?php esc_html_e( 'Set colors by type (event/exercise) or by tag. Tag colors override type colors.', 'd4h-calendar' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Set colors by type (event/exercise) or by tag. Tag colors override type colors. Drag tags to set priority: when an event has multiple tags, the first in the list wins.', 'd4h-calendar' ); ?></p>
 			<form method="post" action="">
 				<?php wp_nonce_field( 'd4h_calendar_save_colors', 'd4h_calendar_nonce' ); ?>
 				<input type="hidden" name="d4h_calendar_action" value="save_colors" />
@@ -564,20 +581,21 @@ final class Admin {
 						<tr>
 							<th scope="row"><?php esc_html_e( 'Tags', 'd4h-calendar' ); ?></th>
 							<td style="padding: 0;">
-								<style>.d4h-tags-colors-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 8px;padding:0;max-width:100%;margin-top:4px;}.d4h-tag-color-item{display:flex;align-items:center;gap:4px;min-width:0;padding:0;}.d4h-tag-color-item label{margin:0;padding:0;width:5em;min-width:5em;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;}.d4h-tag-color-item input[type="color"]{flex-shrink:0;width:28px;height:24px;}.d4h-tag-color-item .d4h-hex-input{width:5.5em;flex-shrink:0;min-width:0;}</style>
-								<div class="d4h-tags-colors-grid">
+								<style>.d4h-tags-colors-sortable{list-style:none;margin:0;padding:0;}.d4h-tag-color-item{display:flex;align-items:center;gap:4px;min-width:0;padding:4px 0;}.d4h-tag-color-item .d4h-drag-handle{cursor:grab;color:#72777c;padding:0 4px;}.d4h-tag-color-item .d4h-drag-handle:hover{color:#1d2327;}.d4h-tag-color-item label{margin:0;padding:0;width:8em;min-width:8em;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;}.d4h-tag-color-item input[type="color"]{flex-shrink:0;width:28px;height:24px;}.d4h-tag-color-item .d4h-hex-input{width:5.5em;flex-shrink:0;min-width:0;}.ui-sortable-placeholder{visibility:visible!important;border:1px dashed #c3c4c7;background:#f0f0f1;height:2.5em;}</style>
+								<ul id="d4h-tags-sortable" class="d4h-tags-colors-sortable">
 									<?php foreach ( $tag_names as $tag_name ) : ?>
 										<?php
 										$current = isset( $tag_colors[ $tag_name ] ) ? $tag_colors[ $tag_name ] : '#3788d8';
 										$input_id = 'd4h_tag_color_' . sanitize_key( $tag_name );
 										?>
-										<div class="d4h-tag-color-item">
+										<li class="d4h-tag-color-item">
+											<span class="d4h-drag-handle dashicons dashicons-move" aria-hidden="true"></span>
 											<label for="<?php echo esc_attr( $input_id ); ?>" title="<?php echo esc_attr( $tag_name ); ?>"><?php echo esc_html( $tag_name ); ?></label>
 											<input type="color" id="<?php echo esc_attr( $input_id ); ?>" name="d4h_tag_colors[<?php echo esc_attr( $tag_name ); ?>]" value="<?php echo esc_attr( $current ); ?>" />
 											<input type="text" class="small-text d4h-hex-input" value="<?php echo esc_attr( $current ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Color for tag %s', 'd4h-calendar' ), $tag_name ) ); ?>" data-color-for="<?php echo esc_attr( $input_id ); ?>" />
-										</div>
+										</li>
 									<?php endforeach; ?>
-								</div>
+								</ul>
 							</td>
 						</tr>
 					<?php else : ?>

@@ -86,6 +86,6 @@ function d4h_calendar_get_config() {
 		'calendar_event_color'     => '#3788d8',
 		'calendar_exercise_color'  => '#6c757d',
 		'calendar_locale'          => 'is',
-		'calendar_content_height'  => 600,
+		'calendar_content_height'  => 800,
 	);
 }
