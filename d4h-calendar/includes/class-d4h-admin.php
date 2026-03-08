@@ -86,6 +86,11 @@ final class Admin {
 				$this->save_calendar_content_height();
 			}
 		}
+		if ( $action === 'save_custom_css' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_custom_css' ) ) {
+				$this->save_custom_css();
+			}
+		}
 	}
 
 	/**
@@ -270,6 +275,17 @@ final class Admin {
 		} else {
 			delete_option( $option_key );
 		}
+
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	private function save_custom_css(): void {
+		$option_key = $this->config['option_custom_css'] ?? 'd4h_calendar_custom_css';
+		$custom_css = isset( $_POST['d4h_custom_css'] ) ? wp_strip_all_tags( wp_unslash( $_POST['d4h_custom_css'] ) ) : '';
+
+		update_option( $option_key, $custom_css, false );
 
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
 		wp_safe_redirect( $url );
@@ -605,6 +621,21 @@ final class Admin {
 					<?php endif; ?>
 				</table>
 				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save colors', 'd4h-calendar' ); ?>" /></p>
+			</form>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Custom CSS', 'd4h-calendar' ); ?></h2>
+			<?php
+			$option_custom_css = $this->config['option_custom_css'] ?? 'd4h_calendar_custom_css';
+			$custom_css       = get_option( $option_custom_css, '' );
+			?>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'd4h_calendar_save_custom_css', 'd4h_calendar_nonce' ); ?>
+				<input type="hidden" name="d4h_calendar_action" value="save_custom_css" />
+				<p class="description"><?php esc_html_e( 'Add custom CSS to style the calendar. It will be loaded after the plugin stylesheet.', 'd4h-calendar' ); ?></p>
+				<textarea id="d4h_custom_css" name="d4h_custom_css" rows="12" class="large-text code" style="font-family: Consolas, Monaco, monospace;"><?php echo esc_textarea( $custom_css ); ?></textarea>
+				<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save custom CSS', 'd4h-calendar' ); ?>" /></p>
 			</form>
 		</div>
 		<?php

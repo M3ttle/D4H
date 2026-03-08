@@ -52,6 +52,10 @@
 	padding: 2px 4px !important;
 }
 
+.fc-col-header {
+	margin-bottom: 0;
+}
+
 .d4h-calendar .fc-daygrid-day-frame {
 	padding: 2px !important;
 	min-height: 0;

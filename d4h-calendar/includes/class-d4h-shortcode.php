@@ -68,6 +68,12 @@ final class Shortcode {
 			D4H_CALENDAR_VERSION
 		);
 
+		$option_custom_css = $this->config['option_custom_css'] ?? 'd4h_calendar_custom_css';
+		$custom_css       = get_option( $option_custom_css, '' );
+		if ( $custom_css !== '' ) {
+			wp_add_inline_style( 'd4h-calendar-front', $custom_css );
+		}
+
 		$default_view   = $this->config['calendar_default_view'] ?? 'dayGridMonth';
 		$calendar_locale = $this->config['calendar_locale'] ?? 'is';
 		$option_key      = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
