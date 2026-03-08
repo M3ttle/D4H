@@ -14,7 +14,7 @@ WordPress plugins that integrate with the **D4H Team Manager API** for emergency
 
 When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents. Credentials, API logs, and sync history are stored centrally in Core. Calendar and Incidents read from Core and no longer show their own credential forms.
 
-Without Core, Calendar and Incidents add their pages under **Settings** and use their own credential options.
+Without Core, Calendar and Incidents add their pages under **Settings**. API credentials are configured in D4H Core.
 
 ### Recommended: Use D4H Core
 
@@ -41,8 +41,8 @@ Stores **shared API credentials** (token, context, context ID), **API logs**, an
 |------|------|
 | `d4h-core.php` | Plugin bootstrap |
 | `includes/config.php` | Config (no secrets) |
-| `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()` |
-| `includes/class-d4h-core-admin.php` | D4H menu, Settings page, credentials form |
+| `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()`, `d4h_core_get_github_token()` |
+| `includes/class-d4h-core-admin.php` | D4H menu, Settings page (credentials, GitHub token, sync history, API logs) |
 | `includes/class-d4h-core-logger.php` | API logs and sync history |
 | `uninstall.php` | Cleans up on uninstall |
 
@@ -56,13 +56,13 @@ Fetches **events** and **exercises** from the D4H Team Manager API, stores them 
 
 1. Copy `d4h-calendar` into `wp-content/plugins/` and activate.
 2. With Core: go to **D4H → Calendar**. Without Core: go to **Settings → D4H Calendar**.
-3. Enter credentials (if no Core), choose sync interval, set calendar options.
+3. Configure API credentials in D4H Core, then choose sync interval and set calendar options in D4H Calendar.
 4. Add shortcode `[d4h_calendar]` to any page or post.
 
 ### Features
 
 - **Sync**: Automatic sync via cron (configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
-- **Admin page**: API credentials, sync interval, calendar content height (200–2000 px), event colors (by type or tag), custom CSS, sync history.
+- **Admin page**: Sync interval, calendar content height (200–2000 px), event colors (by type or tag), custom CSS, update history. API credentials and GitHub token are in D4H Core.
 - **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set.
 - **Calendar**: FullCalendar with month/week/day views, event details modal.
 
@@ -139,7 +139,7 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 - **D4H Core**: When active, provides API credentials, API logs, sync history, and the D4H admin menu.
 - **API**: All plugins use the D4H Team Manager API v3 (HTTPS, Bearer token).
 - **Credentials**: Stored in Core (or per-plugin if Core is not active).
-- **Updates**: Core, Calendar, and Incidents support self-update from GitHub (M3ttle/D4H).
+- **Updates**: Core, Calendar, and Incidents support self-update from GitHub (M3ttle/D4H). GitHub API token for higher rate limits is configured in D4H → Settings.
 - **Security**: API credentials in options; nonces and capability checks on admin/AJAX.
 
 ---

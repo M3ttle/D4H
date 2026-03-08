@@ -33,7 +33,7 @@ final class Plugin_Updater {
 		}
 		$repo  = ltrim( $repo, '/' );
 		$url   = 'https://api.github.com/repos/' . $repo . '/releases/latest';
-		$token = defined( 'D4H_INCIDENTS_GITHUB_TOKEN' ) ? D4H_INCIDENTS_GITHUB_TOKEN : get_option( $this->config['option_github_token'] ?? '', '' );
+		$token = function_exists( 'd4h_core_get_github_token' ) ? d4h_core_get_github_token() : ( defined( 'D4H_INCIDENTS_GITHUB_TOKEN' ) ? D4H_INCIDENTS_GITHUB_TOKEN : '' );
 		$token = is_string( $token ) ? trim( $token ) : '';
 
 		$request_args = array(

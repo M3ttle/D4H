@@ -29,6 +29,15 @@ require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-admin.php';
 require_once D4H_CALENDAR_PLUGIN_DIR . '/includes/class-d4h-loader.php';
 
 add_action( 'plugins_loaded', function () {
+	// One-time cleanup: remove legacy options now managed by D4H Core.
+	if ( ! get_option( 'd4h_calendar_legacy_credentials_removed', false ) ) {
+		delete_option( 'd4h_calendar_github_token' );
+		delete_option( 'd4h_calendar_api_token' );
+		delete_option( 'd4h_calendar_api_org' );
+		delete_option( 'd4h_calendar_api_org_id' );
+		update_option( 'd4h_calendar_legacy_credentials_removed', true, false );
+	}
+
 	$config = d4h_calendar_get_config();
 	$loader = new D4H_Calendar\Loader( $config );
 	$loader->init();

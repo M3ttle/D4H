@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin: menu, API credentials form, and Sync now (Step 2). AJAX in Step 3.
+ * Admin: menu, Sync now, update history, and calendar settings. AJAX in Step 3.
  *
  * @package D4H_Calendar
  */
@@ -34,7 +34,6 @@ final class Admin {
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu_page' ) );
 		add_action( 'admin_init', array( $this, 'handle_post' ) );
-		add_action( 'admin_init', array( $this, 'handle_check_updates' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
 		$action_sync   = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
@@ -61,11 +60,6 @@ final class Admin {
 
 		$action = sanitize_text_field( wp_unslash( $_POST['d4h_calendar_action'] ) );
 
-		if ( $action === 'save_credentials' && ! defined( 'D4H_CORE_ACTIVE' ) ) {
-			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_credentials' ) ) {
-				$this->save_credentials();
-			}
-		}
 		if ( $action === 'save_sync_interval' ) {
 			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_sync_interval' ) ) {
 				$this->save_sync_interval();
@@ -74,11 +68,6 @@ final class Admin {
 		if ( $action === 'save_colors' ) {
 			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_colors' ) ) {
 				$this->save_colors();
-			}
-		}
-		if ( $action === 'save_github_token' ) {
-			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_github_token' ) ) {
-				$this->save_github_token();
 			}
 		}
 		if ( $action === 'save_calendar_content_height' ) {
@@ -94,38 +83,16 @@ final class Admin {
 	}
 
 	/**
-	 * Handles "Check for plugin updates" link: clears cached update data and redirects to Updates page.
-	 */
-	public function handle_check_updates(): void {
-		$slug = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
-		if ( isset( $_GET['page'] ) && sanitize_text_field( wp_unslash( $_GET['page'] ) ) !== $slug ) {
-			return;
-		}
-		if ( ! isset( $_GET['check_updates'] ) || $_GET['check_updates'] !== '1' ) {
-			return;
-		}
-		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
-			return;
-		}
-		if ( ! wp_verify_nonce( isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '', 'd4h_check_updates' ) ) {
-			return;
-		}
-		delete_site_transient( 'update_plugins' );
-		wp_clean_plugins_cache( false );
-		wp_update_plugins();
-		wp_safe_redirect( admin_url( 'update-core.php' ) );
-		exit;
-	}
-
-	/**
 	 * Enqueue admin JS on our settings page only.
 	 *
 	 * @param string $hook
 	 */
 	public function enqueue_scripts( string $hook ): void {
-		$slug = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
-		$expected = defined( 'D4H_CORE_ACTIVE' ) ? 'd4h-core_page_' . $slug : 'settings_page_' . $slug;
-		if ( $hook !== $expected ) {
+		$slug   = $this->config['admin_menu_slug'] ?? 'd4h-calendar';
+		$hooks  = array( 'd4h-core_page_' . $slug, 'settings_page_' . $slug );
+		$is_our_page = in_array( $hook, $hooks, true );
+		$page   = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		if ( ! $is_our_page && $page !== $slug ) {
 			return;
 		}
 
@@ -143,6 +110,15 @@ final class Admin {
 			'nonce'        => wp_create_nonce( 'd4h_calendar_admin' ),
 			'actionSync'   => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
 			'actionDelete' => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
+			'i18n'         => array(
+				'lastSyncStatus' => __( 'Last sync status:', 'd4h-calendar' ),
+				'success'        => __( 'Success', 'd4h-calendar' ),
+				'error'          => __( 'Error', 'd4h-calendar' ),
+				'manual'         => __( 'Manual', 'd4h-calendar' ),
+				'cron'           => __( 'Cron', 'd4h-calendar' ),
+				'updating'       => __( 'Updating...', 'd4h-calendar' ),
+				'syncSuccess'    => __( 'Sync completed successfully.', 'd4h-calendar' ),
+			),
 		) );
 	}
 
@@ -155,7 +131,7 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
 		}
 
-		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : get_option( $this->config['option_token'] ?? 'd4h_calendar_api_token', '' );
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : '';
 
 		if ( $token === '' ) {
 			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-calendar' ) ), 400 );
@@ -175,18 +151,48 @@ final class Admin {
 			update_option( $option_error, $error_message, false );
 			update_option( $option_status, 'error', false );
 			Sync_History::log_sync( $this->config, 'error', $error_message, 'manual', $duration, null, 'calendar' );
-			wp_send_json_error( array( 'message' => $error_message ), 500 );
+			$entry_time = time();
+			$new_entry  = array(
+				'time'           => $entry_time,
+				'formatted_time' => wp_date( 'j M Y, H:i:s', $entry_time ),
+				'status'         => 'error',
+				'source'         => 'manual',
+				'duration_sec'   => round( $duration, 2 ),
+				'error'          => $error_message,
+			);
+			wp_send_json_error( array(
+				'message'           => $error_message,
+				'last_sync_status'  => 'error',
+				'last_sync_error'   => $error_message,
+				'sync_history_entry' => $new_entry,
+			), 500 );
 		}
 
 		delete_option( $option_error );
-			update_option( $option_status, 'success', false );
-			Sync_History::log_sync( $this->config, 'success', '', 'manual', $duration, null, 'calendar' );
+		update_option( $option_status, 'success', false );
+		Sync_History::log_sync( $this->config, 'success', '', 'manual', $duration, null, 'calendar' );
 
 		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
 		$updated                  = get_option( $option_name_last_updated, 0 );
 		$formatted  = $updated ? wp_date( 'j M Y, H:i', $updated ) : __( 'Never', 'd4h-calendar' );
 
-		wp_send_json_success( array( 'last_updated' => $formatted, 'last_updated_ts' => $updated ) );
+		$entry_time = time();
+		$new_entry  = array(
+			'time'           => $entry_time,
+			'formatted_time' => wp_date( 'j M Y, H:i:s', $entry_time ),
+			'status'         => 'success',
+			'source'         => 'manual',
+			'duration_sec'   => round( $duration, 2 ),
+			'error'          => '',
+		);
+
+		wp_send_json_success( array(
+			'last_updated'       => $formatted,
+			'last_updated_ts'    => $updated,
+			'last_sync_status'   => 'success',
+			'last_sync_error'    => '',
+			'sync_history_entry' => $new_entry,
+		) );
 	}
 
 	/**
@@ -212,24 +218,6 @@ final class Admin {
 		wp_send_json_success( array( 'deleted' => $result ) );
 	}
 
-	private function save_credentials(): void {
-		$option_name_token   = $this->config['option_token'] ?? 'd4h_calendar_api_token';
-		$option_name_org     = $this->config['option_context'] ?? 'd4h_calendar_api_org';
-		$option_name_org_id  = $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id';
-
-		$token   = isset( $_POST['d4h_api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_token'] ) ) : '';
-		$org_type = isset( $_POST['d4h_api_context'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context'] ) ) : '';
-		$org_id   = isset( $_POST['d4h_api_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_api_context_id'] ) ) : '';
-
-		update_option( $option_name_token, $token, false );
-		update_option( $option_name_org, $org_type, false );
-		update_option( $option_name_org_id, $org_id, false );
-
-		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) );
-		wp_safe_redirect( $url );
-		exit;
-	}
-
 	private function save_sync_interval(): void {
 		$option_key = $this->config['option_cron_interval_sec'] ?? 'd4h_calendar_cron_interval_sec';
 		$presets    = $this->config['cron_interval_presets'] ?? array();
@@ -247,19 +235,6 @@ final class Admin {
 			$cron->schedule();
 		}
 
-		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) );
-		wp_safe_redirect( $url );
-		exit;
-	}
-
-	private function save_github_token(): void {
-		$option_key = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
-		$token      = isset( $_POST['d4h_github_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_github_token'] ) ) : '';
-		if ( $token !== '' ) {
-			update_option( $option_key, $token, false );
-		} else {
-			delete_option( $option_key );
-		}
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) );
 		wp_safe_redirect( $url );
 		exit;
@@ -366,10 +341,7 @@ final class Admin {
 	public function render_page(): void {
 		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
 
-		$token    = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : get_option( $this->config['option_token'] ?? 'd4h_calendar_api_token', '' );
-		$org_type = function_exists( 'd4h_core_get_context' ) ? d4h_core_get_context() : get_option( $this->config['option_context'] ?? 'd4h_calendar_api_org', '' );
-		$org_id   = function_exists( 'd4h_core_get_context_id' ) ? d4h_core_get_context_id() : get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id', '' );
-		$updated  = get_option( $option_name_last_updated, 0 );
+		$updated = get_option( $option_name_last_updated, 0 );
 
 		$page_title = esc_html( $this->config['admin_page_title'] ?? 'D4H Calendar' );
 
@@ -394,55 +366,32 @@ final class Admin {
 			$last_status   = get_option( $option_status, '' );
 			$last_error    = get_option( $option_error, '' );
 			?>
-			<?php if ( $last_status === 'error' && $last_error ) : ?>
-				<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php echo esc_html( $last_error ); ?></p></div>
-			<?php elseif ( $last_status === 'success' ) : ?>
-				<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <?php esc_html_e( 'Success', 'd4h-calendar' ); ?></p>
-			<?php endif; ?>
+			<div id="d4h-last-sync-status" class="d4h-last-sync-status">
+				<?php if ( $last_status === 'error' && $last_error ) : ?>
+					<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <span id="d4h-last-sync-status-text"><?php echo esc_html( $last_error ); ?></span></p></div>
+				<?php elseif ( $last_status === 'success' ) : ?>
+					<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <span id="d4h-last-sync-status-text"><?php esc_html_e( 'Success', 'd4h-calendar' ); ?></span></p>
+				<?php else : ?>
+					<p><strong><?php esc_html_e( 'Last sync status:', 'd4h-calendar' ); ?></strong> <span id="d4h-last-sync-status-text"><?php esc_html_e( '—', 'd4h-calendar' ); ?></span></p>
+				<?php endif; ?>
+			</div>
 			<p><strong><?php esc_html_e( 'Last updated:', 'd4h-calendar' ); ?></strong>
 				<span id="d4h-last-updated"><?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?></span>
 			</p>
 			<p>
-				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Retrieve Calendar data', 'd4h-calendar' ); ?></button>
-				<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
-					<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'check_updates' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) ), 'd4h_check_updates' ) ); ?>" class="button button-secondary"><?php esc_html_e( 'Check for plugin updates', 'd4h-calendar' ); ?></a>
-				<?php endif; ?>
+				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Update calendar', 'd4h-calendar' ); ?></button>
 				<?php if ( ! empty( $this->config['enable_delete_btn'] ) ) : ?>
 					<?php $retention = (int) ( $this->config['retention_days'] ?? 90 ); ?>
 					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
 				<?php endif; ?>
 			</p>
-			<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
-				<?php
-				$option_github   = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
-				$has_const_token = defined( 'D4H_CALENDAR_GITHUB_TOKEN' );
-				$has_opt_token   = ! $has_const_token && get_option( $option_github, '' ) !== '';
-				?>
-				<p style="margin-top: 1em;">
-					<button type="button" id="d4h-github-token-toggle" class="button-link" aria-expanded="false" aria-controls="d4h-github-token-form">
-						<span class="d4h-toggle-show"><?php esc_html_e( 'Show GitHub API token', 'd4h-calendar' ); ?></span>
-						<span class="d4h-toggle-hide" style="display:none;"><?php esc_html_e( 'Hide GitHub API token', 'd4h-calendar' ); ?></span>
-					</button>
-				</p>
-				<form id="d4h-github-token-form" method="post" action="" style="margin-top: 0.5em; display:none;" aria-hidden="true">
-					<?php wp_nonce_field( 'd4h_calendar_save_github_token', 'd4h_calendar_nonce' ); ?>
-					<input type="hidden" name="d4h_calendar_action" value="save_github_token" />
-					<label for="d4h_github_token"><?php esc_html_e( 'GitHub API token (optional)', 'd4h-calendar' ); ?></label>
-					<input type="password" id="d4h_github_token" name="d4h_github_token" value="" class="regular-text" autocomplete="off" placeholder="<?php echo $has_const_token ? esc_attr__( 'Set via wp-config.php', 'd4h-calendar' ) : ( $has_opt_token ? esc_attr__( 'Token saved — enter new to replace', 'd4h-calendar' ) : '' ); ?>" <?php echo $has_const_token ? ' readonly' : ''; ?> />
-					<button type="submit" class="button button-secondary"<?php echo $has_const_token ? ' disabled' : ''; ?>><?php esc_attr_e( 'Save', 'd4h-calendar' ); ?></button>
-					<p class="description"><?php esc_html_e( 'Increases rate limit from 60 to 5,000 requests/hour. Create at GitHub → Settings → Developer settings → Personal access tokens. No extra scopes needed for public repos.', 'd4h-calendar' ); ?> <?php echo $has_opt_token ? ' ' . esc_html__( 'Leave empty and save to remove.', 'd4h-calendar' ) : ''; ?></p>
-				</form>
-			<?php endif; ?>
 			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
 
-			<h3><?php esc_html_e( 'Sync history', 'd4h-calendar' ); ?></h3>
+			<h3><?php esc_html_e( 'Update history', 'd4h-calendar' ); ?></h3>
 			<?php
 			$sync_history = Sync_History::get_history( $this->config, 100 );
 			?>
-			<?php if ( empty( $sync_history ) ) : ?>
-				<p class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-calendar' ); ?></p>
-			<?php else : ?>
-				<table class="wp-list-table widefat fixed striped">
+			<table class="wp-list-table widefat fixed striped" id="d4h-sync-history-table">
 					<thead>
 						<tr>
 							<th scope="col"><?php esc_html_e( 'Time', 'd4h-calendar' ); ?></th>
@@ -452,7 +401,10 @@ final class Admin {
 							<th scope="col"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></th>
 						</tr>
 					</thead>
-					<tbody>
+					<tbody id="d4h-sync-history-tbody">
+						<?php if ( empty( $sync_history ) ) : ?>
+							<tr id="d4h-sync-history-empty-row"><td colspan="5" class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-calendar' ); ?></td></tr>
+						<?php else : ?>
 						<?php foreach ( $sync_history as $entry ) : ?>
 							<?php
 							$time         = isset( $entry['time'] ) ? (int) $entry['time'] : 0;
@@ -475,37 +427,10 @@ final class Admin {
 								<td><?php echo $error ? esc_html( $error ) : '—'; ?></td>
 							</tr>
 						<?php endforeach; ?>
+						<?php endif; ?>
 					</tbody>
 				</table>
-				<p class="description"><?php esc_html_e( 'Latest 100 sync runs.', 'd4h-calendar' ); ?></p>
-			<?php endif; ?>
-
-			<hr />
-
-			<h2><?php esc_html_e( 'API credentials', 'd4h-calendar' ); ?></h2>
-			<?php if ( defined( 'D4H_CORE_ACTIVE' ) ) : ?>
-				<p><?php esc_html_e( 'API credentials are managed in D4H → Settings.', 'd4h-calendar' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=d4h-core' ) ); ?>"><?php esc_html_e( 'Go to D4H Settings', 'd4h-calendar' ); ?></a></p>
-			<?php else : ?>
-				<form method="post" action="">
-					<?php wp_nonce_field( 'd4h_calendar_save_credentials', 'd4h_calendar_nonce' ); ?>
-					<input type="hidden" name="d4h_calendar_action" value="save_credentials" />
-					<table class="form-table">
-						<tr>
-							<th scope="row"><label for="d4h_api_token"><?php esc_html_e( 'API Token', 'd4h-calendar' ); ?></label></th>
-							<td><input type="password" id="d4h_api_token" name="d4h_api_token" value="<?php echo esc_attr( $token ); ?>" class="regular-text" autocomplete="off" /></td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="d4h_api_context"><?php esc_html_e( 'team or organisation (optional)', 'd4h-calendar' ); ?></label></th>
-							<td><input type="text" id="d4h_api_context" name="d4h_api_context" value="<?php echo esc_attr( $org_type ); ?>" placeholder="team or organisation" class="regular-text" /></td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="d4h_api_context_id"><?php esc_html_e( 'Team ID (optional)', 'd4h-calendar' ); ?></label></th>
-							<td><input type="text" id="d4h_api_context_id" name="d4h_api_context_id" value="<?php echo esc_attr( $org_id ); ?>" class="regular-text" /></td>
-						</tr>
-					</table>
-					<p class="submit"><input type="submit" name="submit" class="button button-primary" value="<?php esc_attr_e( 'Save credentials', 'd4h-calendar' ); ?>" /></p>
-				</form>
-			<?php endif; ?>
+			<p class="description"><?php esc_html_e( 'Latest 100 updates.', 'd4h-calendar' ); ?></p>
 
 			<hr />
 

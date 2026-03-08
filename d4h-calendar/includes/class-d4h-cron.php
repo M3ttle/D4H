@@ -100,7 +100,7 @@ final class Cron {
 			return;
 		}
 
-		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : get_option( $this->config['option_token'] ?? 'd4h_calendar_api_token', '' );
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : '';
 		if ( $token === '' ) {
 			return;
 		}

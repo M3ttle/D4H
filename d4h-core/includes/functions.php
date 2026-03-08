@@ -8,15 +8,11 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Get D4H API token from Core (if active) or legacy options.
+ * Get D4H API token from Core.
  *
  * @return string
  */
 function d4h_core_get_token(): string {
-	if ( ! defined( 'D4H_CORE_ACTIVE' ) ) {
-		return get_option( 'd4h_calendar_api_token', '' )
-			?: get_option( 'd4h_incidents_api_token', '' );
-	}
 	$config = d4h_core_get_config();
 	return (string) get_option( $config['option_token'] ?? 'd4h_core_api_token', '' );
 }
@@ -27,12 +23,28 @@ function d4h_core_get_token(): string {
  * @return string
  */
 function d4h_core_get_context(): string {
-	if ( ! defined( 'D4H_CORE_ACTIVE' ) ) {
-		return get_option( 'd4h_calendar_api_org', '' )
-			?: get_option( 'd4h_incidents_api_context', '' );
-	}
 	$config = d4h_core_get_config();
 	return (string) get_option( $config['option_context'] ?? 'd4h_core_api_context', '' );
+}
+
+/**
+ * Get GitHub API token for plugin updates. Used by Calendar and Incidents to increase rate limit (60→5000/hour).
+ *
+ * @return string
+ */
+function d4h_core_get_github_token(): string {
+	if ( defined( 'D4H_CORE_GITHUB_TOKEN' ) && is_string( D4H_CORE_GITHUB_TOKEN ) ) {
+		return trim( D4H_CORE_GITHUB_TOKEN );
+	}
+	if ( defined( 'D4H_CALENDAR_GITHUB_TOKEN' ) && is_string( D4H_CALENDAR_GITHUB_TOKEN ) ) {
+		return trim( D4H_CALENDAR_GITHUB_TOKEN );
+	}
+	if ( defined( 'D4H_INCIDENTS_GITHUB_TOKEN' ) && is_string( D4H_INCIDENTS_GITHUB_TOKEN ) ) {
+		return trim( D4H_INCIDENTS_GITHUB_TOKEN );
+	}
+	$config = d4h_core_get_config();
+	$token  = get_option( $config['option_github_token'] ?? 'd4h_core_github_token', '' );
+	return is_string( $token ) ? trim( $token ) : '';
 }
 
 /**
@@ -41,10 +53,6 @@ function d4h_core_get_context(): string {
  * @return string
  */
 function d4h_core_get_context_id(): string {
-	if ( ! defined( 'D4H_CORE_ACTIVE' ) ) {
-		return get_option( 'd4h_calendar_api_org_id', '' )
-			?: get_option( 'd4h_incidents_api_context_id', '' );
-	}
 	$config = d4h_core_get_config();
 	return (string) get_option( $config['option_context_id'] ?? 'd4h_core_api_context_id', '' );
 }

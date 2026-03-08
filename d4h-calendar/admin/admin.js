@@ -1,11 +1,19 @@
 (function () {
 	'use strict';
 
+	function init() {
 	var cfg = window.d4hCalendarAdmin || {};
 	var ajaxUrl = cfg.ajaxUrl || '';
 	var nonce = cfg.nonce || '';
 	var actionSync = cfg.actionSync || 'd4h_calendar_ajax_sync';
 	var actionDelete = cfg.actionDelete || 'd4h_calendar_ajax_delete';
+	var i18n = cfg.i18n || {};
+
+	function escapeHtml(text) {
+		var div = document.createElement('div');
+		div.textContent = text || '';
+		return div.innerHTML;
+	}
 
 	function showMessage(text, type) {
 		var el = document.getElementById('d4h-admin-message');
@@ -26,24 +34,64 @@
 		if (el) el.textContent = text || 'Never';
 	}
 
-	function setButtonLoading(btnId, loading) {
+	function setLastSyncStatus(status, errorMessage) {
+		var wrap = document.getElementById('d4h-last-sync-status');
+		if (!wrap) return;
+		var label = i18n.lastSyncStatus || 'Last sync status:';
+		var successLabel = i18n.success || 'Success';
+		var errorLabel = i18n.error || 'Error';
+		var text = status === 'success' ? successLabel : (errorMessage || errorLabel);
+		if (status === 'error' && errorMessage) {
+			wrap.innerHTML = '<div class="notice notice-error inline"><p><strong>' + escapeHtml(label) + '</strong> <span id="d4h-last-sync-status-text">' + escapeHtml(errorMessage) + '</span></p></div>';
+		} else {
+			wrap.innerHTML = '<p><strong>' + escapeHtml(label) + '</strong> <span id="d4h-last-sync-status-text">' + escapeHtml(text) + '</span></p>';
+		}
+	}
+
+	function prependSyncHistoryRow(entry) {
+		var tbody = document.getElementById('d4h-sync-history-tbody');
+		if (!tbody) return;
+		var emptyRow = document.getElementById('d4h-sync-history-empty-row');
+		if (emptyRow) emptyRow.remove();
+		var successLabel = i18n.success || 'Success';
+		var errorLabel = i18n.error || 'Error';
+		var manualLabel = i18n.manual || 'Manual';
+		var cronLabel = i18n.cron || 'Cron';
+		var statusText = (entry.status === 'success') ? successLabel : errorLabel;
+		var statusColor = (entry.status === 'success') ? '#00a32a' : '#d63638';
+		var sourceText = (entry.source === 'cron') ? cronLabel : manualLabel;
+		var durationText = (entry.duration_sec != null) ? Number(entry.duration_sec).toFixed(2) + ' s' : '—';
+		var errorText = entry.error || '—';
+		var timeText = entry.formatted_time || '—';
+		var tr = document.createElement('tr');
+		tr.innerHTML =
+			'<td>' + escapeHtml(timeText) + '</td>' +
+			'<td><span style="color:' + statusColor + ';">' + escapeHtml(statusText) + '</span></td>' +
+			'<td>' + escapeHtml(sourceText) + '</td>' +
+			'<td>' + escapeHtml(durationText) + '</td>' +
+			'<td>' + escapeHtml(errorText) + '</td>';
+		tbody.insertBefore(tr, tbody.firstChild);
+	}
+
+	function setButtonLoading(btnId, loading, loadingLabel) {
 		var btn = document.getElementById(btnId);
 		if (!btn) return;
 		btn.disabled = !!loading;
 		if (loading) {
-			btn.dataset.originalText = btn.textContent;
-			btn.textContent = '...';
-		} else if (btn.dataset.originalText) {
-			btn.textContent = btn.dataset.originalText;
+			btn.dataset.originalHtml = btn.innerHTML;
+			btn.innerHTML = '<span class="spinner is-active" style="float:none;display:inline-block;margin:0 4px 0 0;vertical-align:middle;"></span> ' + (loadingLabel || i18n.updating || '...');
+		} else if (btn.dataset.originalHtml) {
+			btn.innerHTML = btn.dataset.originalHtml;
+			delete btn.dataset.originalHtml;
 		}
 	}
 
-	// Retrieve Calendar data (sync)
+	// Update calendar (sync)
 	var updateBtn = document.getElementById('d4h-update-now');
 	if (updateBtn) {
 		updateBtn.addEventListener('click', function () {
 			hideMessage();
-			setButtonLoading('d4h-update-now', true);
+			setButtonLoading('d4h-update-now', true, i18n.updating);
 
 			var formData = new FormData();
 			formData.append('action', actionSync);
@@ -56,11 +104,20 @@
 			})
 				.then(function (r) { return r.json(); })
 				.then(function (data) {
-					if (data.success && data.data && data.data.last_updated) {
-						setLastUpdated(data.data.last_updated);
-						showMessage('Sync completed successfully.', 'success');
+					var payload = data.data || {};
+					if (data.success) {
+						setLastUpdated(payload.last_updated);
+						setLastSyncStatus(payload.last_sync_status || 'success', payload.last_sync_error);
+						if (payload.sync_history_entry) {
+							prependSyncHistoryRow(payload.sync_history_entry);
+						}
+						showMessage(i18n.syncSuccess || 'Sync completed successfully.', 'success');
 					} else {
-						showMessage(data.data && data.data.message ? data.data.message : 'Sync failed.', 'error');
+						setLastSyncStatus(payload.last_sync_status || 'error', payload.last_sync_error || payload.message);
+						if (payload.sync_history_entry) {
+							prependSyncHistoryRow(payload.sync_history_entry);
+						}
+						showMessage(payload.message || 'Sync failed.', 'error');
 					}
 				})
 				.catch(function () {
@@ -69,22 +126,6 @@
 				.finally(function () {
 					setButtonLoading('d4h-update-now', false);
 				});
-		});
-	}
-
-	// GitHub token show/hide toggle (default hidden)
-	var githubToggle = document.getElementById('d4h-github-token-toggle');
-	var githubForm = document.getElementById('d4h-github-token-form');
-	if (githubToggle && githubForm) {
-		var showLabel = githubToggle.querySelector('.d4h-toggle-show');
-		var hideLabel = githubToggle.querySelector('.d4h-toggle-hide');
-		githubToggle.addEventListener('click', function () {
-			var hidden = githubForm.style.display === 'none';
-			githubForm.style.display = hidden ? 'block' : 'none';
-			githubForm.setAttribute('aria-hidden', hidden ? 'false' : 'true');
-			githubToggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
-			if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
-			if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
 		});
 	}
 
@@ -153,5 +194,12 @@
 					setButtonLoading('d4h-delete-old', false);
 				});
 		});
+	}
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
 	}
 })();

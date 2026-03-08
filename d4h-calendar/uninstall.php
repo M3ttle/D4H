@@ -26,9 +26,6 @@ if ( file_exists( $cron_file ) ) {
 
 // Delete all plugin options.
 $option_keys = array(
-	'option_token',
-	'option_context',
-	'option_context_id',
 	'option_last_updated',
 	'option_tags_map',
 	'option_event_color',
@@ -41,6 +38,7 @@ $option_keys = array(
 	'option_last_sync_status',
 	'option_sync_history',
 );
+delete_option( 'd4h_calendar_legacy_credentials_removed' );
 foreach ( $option_keys as $key ) {
 	if ( isset( $config[ $key ] ) ) {
 		delete_option( $config[ $key ] );

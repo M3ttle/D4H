@@ -1,6 +1,6 @@
 <?php
 /**
- * Single config for D4H Calendar plugin. No secrets here; API credentials are saved via the admin form to options.
+ * Single config for D4H Calendar plugin. No secrets here; API credentials are managed in D4H Core.
  *
  * @package D4H_Calendar
  */
@@ -19,10 +19,7 @@ function d4h_calendar_get_config() {
 		'api_version_path'   => '/v3',
 		'whoami_path'        => '/v3/whoami',
 
-		// Option keys (credentials saved from admin form; do not put secrets in this file)
-		'option_token'       => 'd4h_calendar_api_token',
-		'option_context'     => 'd4h_calendar_api_org',
-		'option_context_id'  => 'd4h_calendar_api_org_id',
+		// Option keys (API credentials from D4H Core)
 		'option_last_updated'=> 'd4h_calendar_last_updated',
 		'option_tags_map'    => 'd4h_calendar_tags_map', // id => name for resolving tag IDs
 		'option_event_color'   => 'd4h_calendar_event_color',
@@ -66,7 +63,6 @@ function d4h_calendar_get_config() {
 
 		// Self-update from GitHub releases via Plugins → Updates (owner/repo; empty to disable)
 		'update_github_repo' => 'M3ttle/D4H',
-		'option_github_token' => 'd4h_calendar_github_token', // Optional: increases API rate limit (60→5000/hour)
 
 		// Admin
 		'admin_capability'   => 'manage_options',

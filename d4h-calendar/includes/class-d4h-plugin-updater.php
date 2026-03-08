@@ -89,17 +89,12 @@ final class Plugin_Updater {
 	}
 
 	/**
-	 * Returns the GitHub token for API auth. Prefers wp-config constant over admin option.
+	 * Returns the GitHub token for API auth from D4H Core.
 	 *
 	 * @return string
 	 */
 	private function get_github_token(): string {
-		if ( defined( 'D4H_CALENDAR_GITHUB_TOKEN' ) && is_string( D4H_CALENDAR_GITHUB_TOKEN ) ) {
-			return trim( D4H_CALENDAR_GITHUB_TOKEN );
-		}
-		$option_key = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
-		$token      = get_option( $option_key, '' );
-		return is_string( $token ) ? trim( $token ) : '';
+		return function_exists( 'd4h_core_get_github_token' ) ? d4h_core_get_github_token() : '';
 	}
 
 	/**

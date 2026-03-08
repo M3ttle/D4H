@@ -172,7 +172,7 @@
 				titleFormat: { year: 'numeric', month: 'long' },
 				datesSet: function (arg) {
 					var view = arg.view;
-					var start = view && view.activeStart;
+					var start = view && view.currentStart;
 					var titleEl = el.querySelector('.fc-toolbar-title');
 					if (titleEl && start) {
 						var d = toNativeDate(start);
