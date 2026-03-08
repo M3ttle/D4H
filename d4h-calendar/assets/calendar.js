@@ -36,7 +36,7 @@
 		}
 		html += '<dt>Tegund</dt><dd>' + escapeHtml(props.resourceType === 'exercise' ? 'Æfing' : 'Viðburður') + '</dd>';
 		if (desc) {
-			html += '<dt>Lýsing</dt><dd class="d4h-calendar-modal-description">' + escapeHtml(desc) + '</dd>';
+			html += '<dt>Lýsing</dt><dd class="d4h-calendar-modal-description">' + sanitizeHtmlForDisplay(desc) + '</dd>';
 		}
 		html += '</dl>';
 		html += '<button type="button" class="d4h-calendar-modal-close" aria-label="Loka">Loka</button>';
@@ -67,6 +67,36 @@
 		var div = document.createElement('div');
 		div.textContent = s;
 		return div.innerHTML;
+	}
+
+	/**
+	 * Sanitize HTML for display: allows formatting tags (b, strong, i, em, u, br, p, ul, ol, li, span)
+	 * while stripping scripts and dangerous attributes to prevent XSS.
+	 */
+	function sanitizeHtmlForDisplay(html) {
+		if (!html || typeof html !== 'string') return '';
+		var container = document.createElement('div');
+		container.innerHTML = html;
+		var allowedTags = { b: 1, strong: 1, i: 1, em: 1, u: 1, s: 1, br: 1, p: 1, ul: 1, ol: 1, li: 1, span: 1 };
+		var nodesToRemove = [];
+		var walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT);
+		var node;
+		while ((node = walker.nextNode())) {
+			var tag = node.tagName.toLowerCase();
+			if (!allowedTags[tag]) {
+				nodesToRemove.push(node);
+			} else {
+				for (var i = node.attributes.length - 1; i >= 0; i--) {
+					node.removeAttribute(node.attributes[i].name);
+				}
+			}
+		}
+		nodesToRemove.forEach(function (n) {
+			var parent = n.parentNode;
+			while (n.firstChild) parent.insertBefore(n.firstChild, n);
+			parent.removeChild(n);
+		});
+		return container.innerHTML;
 	}
 
 	var icelandicMonths = [
