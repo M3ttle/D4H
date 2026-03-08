@@ -16,7 +16,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 
 - **Sync**: Automatic sync via cron (configurable interval) and manual “Update now” on the admin page.
 - **Admin page**: API credentials, sync interval, last updated time, last sync status, and “Delete data older than 90 days” (configurable retention).
-- **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal. Height and locale configurable via `config.php`.
+- **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
 - **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output.
 
 ---

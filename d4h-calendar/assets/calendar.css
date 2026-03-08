@@ -86,6 +86,21 @@
 	word-break: break-word;
 }
 
+.d4h-calendar-modal-tags {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.d4h-calendar-tag {
+	display: inline-block;
+	padding: 0.2em 0.6em;
+	background: #e9ecef;
+	color: #495057;
+	border-radius: 4px;
+	font-size: 0.85em;
+}
+
 .d4h-calendar-modal-close {
 	display: block;
 	margin-top: 1.5rem;

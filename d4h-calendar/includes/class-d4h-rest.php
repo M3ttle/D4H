@@ -156,6 +156,7 @@ final class REST {
 			$desc      = isset( $payload['description'] ) ? (string) $payload['description'] : '';
 			$ref       = isset( $payload['reference'] ) ? (string) $payload['reference'] : '';
 			$ref_desc  = isset( $payload['referenceDescription'] ) ? (string) $payload['referenceDescription'] : '';
+			$tags      = $this->extract_tags( $payload );
 
 			$event = array(
 				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,
@@ -167,6 +168,7 @@ final class REST {
 					'description'         => $desc,
 					'reference'           => $ref,
 					'referenceDescription'=> $ref_desc,
+					'tags'                => $tags,
 				),
 			);
 			if ( $end !== null && $end !== '' ) {
@@ -175,6 +177,34 @@ final class REST {
 			$events[] = $event;
 		}
 		return $events;
+	}
+
+	/**
+	 * Extract tag names from API payload. Supports multiple D4H structures:
+	 * - tags: [{name}, ...] or [string, ...]
+	 * - activityTags: [{tag: {name}}, ...] or [{name}, ...]
+	 *
+	 * @param array<string, mixed> $payload
+	 * @return array<int, string>
+	 */
+	private function extract_tags( array $payload ): array {
+		$raw = $payload['tags'] ?? $payload['activityTags'] ?? array();
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+		$names = array();
+		foreach ( $raw as $item ) {
+			if ( is_string( $item ) && trim( $item ) !== '' ) {
+				$names[] = trim( $item );
+			} elseif ( is_array( $item ) ) {
+				$tag_obj = $item['tag'] ?? $item;
+				$name   = $tag_obj['name'] ?? $tag_obj['label'] ?? $tag_obj['title'] ?? '';
+				if ( is_string( $name ) && trim( $name ) !== '' ) {
+					$names[] = trim( $name );
+				}
+			}
+		}
+		return array_values( array_unique( $names ) );
 	}
 
 	private function get_title( array $activity ): string {

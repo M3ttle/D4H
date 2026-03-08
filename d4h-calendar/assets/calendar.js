@@ -38,6 +38,14 @@
 		if (desc) {
 			html += '<dt>Lýsing</dt><dd class="d4h-calendar-modal-description">' + sanitizeHtmlForDisplay(desc) + '</dd>';
 		}
+		var tags = props.tags && Array.isArray(props.tags) ? props.tags : [];
+		if (tags.length) {
+			html += '<dt>Merki</dt><dd><span class="d4h-calendar-modal-tags">';
+			tags.forEach(function (tagName) {
+				html += '<span class="d4h-calendar-tag">' + escapeHtml(String(tagName)) + '</span>';
+			});
+			html += '</span></dd>';
+		}
 		html += '</dl>';
 		html += '<button type="button" class="d4h-calendar-modal-close" aria-label="Loka">Loka</button>';
 		html += '</div></div>';

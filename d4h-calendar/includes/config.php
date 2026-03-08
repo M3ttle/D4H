@@ -18,6 +18,8 @@ function d4h_calendar_get_config() {
 		'api_base_url'       => 'https://api.team-manager.us.d4h.com',
 		'api_version_path'   => '/v3',
 		'whoami_path'        => '/v3/whoami',
+		// Expand related resources (e.g. tags); D4H may require this for tags to appear in response
+		'api_expand'         => 'activityTags,tags',
 
 		// Option keys (credentials saved from admin form; do not put secrets in this file)
 		'option_token'       => 'd4h_calendar_api_token',

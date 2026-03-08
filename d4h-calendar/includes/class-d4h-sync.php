@@ -55,12 +55,17 @@ final class Sync {
 			return new \WP_Error( 'd4h_no_context', __( 'Could not determine API context. Set context and context ID in D4H Calendar settings.', 'd4h-calendar' ) );
 		}
 
-		$events = $this->api->get_events( $context, $context_id );
+		$api_args = array();
+		if ( ! empty( $this->config['api_expand'] ) ) {
+			$api_args['expand'] = $this->config['api_expand'];
+		}
+
+		$events = $this->api->get_events( $context, $context_id, $api_args );
 		if ( is_wp_error( $events ) ) {
 			return $events;
 		}
 
-		$exercises = $this->api->get_exercises( $context, $context_id );
+		$exercises = $this->api->get_exercises( $context, $context_id, $api_args );
 		if ( is_wp_error( $exercises ) ) {
 			return $exercises;
 		}
