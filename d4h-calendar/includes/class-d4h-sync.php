@@ -33,10 +33,12 @@ final class Sync {
 
 	/**
 	 * Run full sync: fetch events and exercises, store, update last_updated option.
+	 * Optionally fetch tags (only on manual admin update, not cron) to reduce API calls.
 	 *
+	 * @param bool $sync_tags Whether to fetch and store tags. Default false.
 	 * @return true|\WP_Error
 	 */
-	public function run_full_sync() {
+	public function run_full_sync( bool $sync_tags = false ) {
 		$context   = get_option( $this->config['option_context'] ?? 'd4h_calendar_api_org', '' );
 		$context_id = get_option( $this->config['option_context_id'] ?? 'd4h_calendar_api_org_id', '' );
 
@@ -68,10 +70,12 @@ final class Sync {
 		$items = $this->normalize_activities( $events, 'event' );
 		$items = array_merge( $items, $this->normalize_activities( $exercises, 'exercise' ) );
 
-		$tags = $this->api->get_tags( $context, $context_id );
-		if ( ! is_wp_error( $tags ) ) {
-			$tags_map = $this->build_tags_map( $tags );
-			update_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', $tags_map, false );
+		if ( $sync_tags ) {
+			$tags = $this->api->get_tags( $context, $context_id );
+			if ( ! is_wp_error( $tags ) ) {
+				$tags_map = $this->build_tags_map( $tags );
+				update_option( $this->config['option_tags_map'] ?? 'd4h_calendar_tags_map', $tags_map, false );
+			}
 		}
 
 		$result = $this->repository->replace_activities( $items );

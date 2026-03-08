@@ -117,6 +117,7 @@ final class Cron {
 
 		$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
 		$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+		$start         = microtime( true );
 
 		try {
 			$database   = new Database( $config );
@@ -124,23 +125,29 @@ final class Cron {
 			$api        = new API_Client( $config, $token );
 			$sync       = new Sync( $config, $api, $repository );
 
-			$result = $sync->run_full_sync();
+			$result   = $sync->run_full_sync( false ); // Cron: events/exercises only, no tags
+			$duration = microtime( true ) - $start;
 
 			if ( is_wp_error( $result ) ) {
-				update_option( $option_error, $result->get_error_message(), false );
+				$error_message = $result->get_error_message();
+				update_option( $option_error, $error_message, false );
 				update_option( $option_status, 'error', false );
+				Sync_History::log_sync( $this->config, 'error', $error_message, 'cron', $duration );
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-					error_log( 'D4H Calendar cron sync failed: ' . $result->get_error_message() );
+					error_log( 'D4H Calendar cron sync failed: ' . $error_message );
 				}
 			} else {
 				delete_option( $option_error );
 				update_option( $option_status, 'success', false );
+				Sync_History::log_sync( $this->config, 'success', '', 'cron', $duration );
 			}
 		} catch ( \Throwable $exception ) {
-			$message = $exception->getMessage();
+			$duration = microtime( true ) - $start;
+			$message  = $exception->getMessage();
 			update_option( $option_error, $message, false );
 			update_option( $option_status, 'error', false );
+			Sync_History::log_sync( $this->config, 'error', $message, 'cron', $duration );
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 				error_log( 'D4H Calendar cron sync exception: ' . $message );

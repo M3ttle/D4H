@@ -14,8 +14,8 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 
 ## Features
 
-- **Sync**: Automatic sync via cron (configurable interval) and manual “Update now” on the admin page.
-- **Admin page**: API credentials, sync interval, last updated time, last sync status, and “Delete data older than 90 days” (configurable retention).
+- **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Update now” on the admin page (events, exercises, and tags).
+- **Admin page**: API credentials, sync interval, last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), and “Delete data older than 90 days” (configurable retention).
 - **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
 - **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output.
 
@@ -44,6 +44,7 @@ The API token and optional context/contextId are saved from the admin form (neve
 | `includes/class-d4h-api-client.php` | D4H API client (events, exercises, pagination) |
 | `includes/class-d4h-repository.php` | Storage: replace, get, delete older than |
 | `includes/class-d4h-sync.php` | Sync: fetch from API, store, update last_updated |
+| `includes/class-d4h-sync-history.php` | Sync history: log and retrieve last 100 runs |
 | `includes/class-d4h-cron.php` | Cron: custom interval, overlap lock, reschedule on change |
 | `includes/class-d4h-rest.php` | REST `GET /wp-json/d4h-calendar/v1/activities` |
 | `includes/class-d4h-shortcode.php` | Shortcode `[d4h_calendar]` and FullCalendar init |

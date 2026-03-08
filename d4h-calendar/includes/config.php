@@ -43,6 +43,7 @@ function d4h_calendar_get_config() {
 		// Sync status options (error handling)
 		'option_last_sync_error'  => 'd4h_calendar_last_sync_error',
 		'option_last_sync_status' => 'd4h_calendar_last_sync_status',
+		'option_sync_history'     => 'd4h_calendar_sync_history',
 
 		// Retention and data
 		'retention_days'     => 90,

@@ -117,19 +117,24 @@ final class Admin {
 
 		$api    = new API_Client( $this->config, $token );
 		$sync   = new Sync( $this->config, $api, $this->repository );
-		$result = $sync->run_full_sync();
+		$start  = microtime( true );
+		$result = $sync->run_full_sync( true ); // Include tags on manual update
+		$duration = microtime( true ) - $start;
 
 		$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
 		$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
 
 		if ( is_wp_error( $result ) ) {
-			update_option( $option_error, $result->get_error_message(), false );
+			$error_message = $result->get_error_message();
+			update_option( $option_error, $error_message, false );
 			update_option( $option_status, 'error', false );
-			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
+			Sync_History::log_sync( $this->config, 'error', $error_message, 'manual', $duration );
+			wp_send_json_error( array( 'message' => $error_message ), 500 );
 		}
 
 		delete_option( $option_error );
 		update_option( $option_status, 'success', false );
+		Sync_History::log_sync( $this->config, 'success', '', 'manual', $duration );
 
 		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
 		$updated                  = get_option( $option_name_last_updated, 0 );
@@ -320,6 +325,53 @@ final class Admin {
 				<?php endif; ?>
 			</p>
 			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Sync history', 'd4h-calendar' ); ?></h2>
+			<?php
+			$sync_history = Sync_History::get_history( $this->config, 100 );
+			?>
+			<?php if ( empty( $sync_history ) ) : ?>
+				<p class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-calendar' ); ?></p>
+			<?php else : ?>
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th scope="col"><?php esc_html_e( 'Time', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Status', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Source', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Duration', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $sync_history as $entry ) : ?>
+							<?php
+							$time         = isset( $entry['time'] ) ? (int) $entry['time'] : 0;
+							$status       = isset( $entry['status'] ) ? $entry['status'] : '';
+							$source       = isset( $entry['source'] ) ? $entry['source'] : '';
+							$duration_sec = isset( $entry['duration_sec'] ) ? (float) $entry['duration_sec'] : null;
+							$error        = isset( $entry['error'] ) ? $entry['error'] : '';
+							?>
+							<tr>
+								<td><?php echo esc_html( $time ? wp_date( 'j M Y, H:i:s', $time ) : '—' ); ?></td>
+								<td>
+									<?php if ( $status === 'success' ) : ?>
+										<span style="color:#00a32a;"><?php esc_html_e( 'Success', 'd4h-calendar' ); ?></span>
+									<?php else : ?>
+										<span style="color:#d63638;"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></span>
+									<?php endif; ?>
+								</td>
+								<td><?php echo esc_html( $source === 'cron' ? __( 'Cron', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) ); ?></td>
+								<td><?php echo $duration_sec !== null ? esc_html( number_format( $duration_sec, 2 ) . ' s' ) : '—'; ?></td>
+								<td><?php echo $error ? esc_html( $error ) : '—'; ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p class="description"><?php esc_html_e( 'Latest 100 sync runs.', 'd4h-calendar' ); ?></p>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
