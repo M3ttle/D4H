@@ -14,8 +14,8 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 
 ## Features
 
-- **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Update now” on the admin page (events, exercises, and tags).
-- **Admin page**: API credentials, sync interval, event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), and “Delete data older than 90 days” (configurable retention).
+- **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
+- **Admin page**: API credentials, sync interval, event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), "Check for plugin update" and "Update plugin now" (when available) for self-update from GitHub, and “Delete data older than 90 days” (configurable retention).
 - **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
 - **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output; API context validated (`team` or `organisation`) and context ID alphanumeric-only to prevent path injection.
 
@@ -26,6 +26,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 All behaviour is controlled from `d4h-calendar/includes/config.php`:
 
 - API base URL, cron interval, retention days
+- `update_github_repo`: GitHub repo for self-update (e.g. `owner/repo`); empty to disable the update button
 - Table/option names, shortcode, REST namespace
 - `calendar_locale`, `calendar_content_height`, `cron_lock_ttl_sec`, etc.
 
@@ -49,7 +50,8 @@ The API token and optional context/contextId are saved from the admin form (neve
 | `includes/class-d4h-rest.php` | REST `GET /wp-json/d4h-calendar/v1/activities` |
 | `includes/class-d4h-shortcode.php` | Shortcode `[d4h_calendar]` and FullCalendar init |
 | `includes/class-d4h-admin.php` | Settings page and AJAX actions |
-| `admin/admin.js` | Admin AJAX (Update now, Delete older) |
+| `includes/class-d4h-plugin-updater.php` | Self-update from GitHub releases |
+| `admin/admin.js` | Admin AJAX (Retrieve Calendar data, plugin update, Delete older) |
 | `assets/calendar.js` | Frontend FullCalendar init |
 | `uninstall.php` | On uninstall: clears scheduled cron, deletes all plugin options, drops the custom table |
 

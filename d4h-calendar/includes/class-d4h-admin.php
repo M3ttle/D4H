@@ -36,10 +36,14 @@ final class Admin {
 		add_action( 'admin_init', array( $this, 'handle_post' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
-		$action_sync   = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
-		$action_delete = $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete';
+		$action_sync        = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
+		$action_delete      = $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete';
+		$action_update      = $this->config['ajax_action_update'] ?? 'd4h_calendar_ajax_update';
+		$action_check_update= $this->config['ajax_action_check_update'] ?? 'd4h_calendar_ajax_check_update';
 		add_action( 'wp_ajax_' . $action_sync, array( $this, 'ajax_sync' ) );
 		add_action( 'wp_ajax_' . $action_delete, array( $this, 'ajax_delete' ) );
+		add_action( 'wp_ajax_' . $action_update, array( $this, 'ajax_update' ) );
+		add_action( 'wp_ajax_' . $action_check_update, array( $this, 'ajax_check_update' ) );
 	}
 
 	/**
@@ -97,10 +101,12 @@ final class Admin {
 			true
 		);
 		wp_localize_script( 'd4h-calendar-admin', 'd4hCalendarAdmin', array(
-			'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-			'nonce'     => wp_create_nonce( 'd4h_calendar_admin' ),
-			'actionSync'   => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
-			'actionDelete' => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
+			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
+			'nonce'             => wp_create_nonce( 'd4h_calendar_admin' ),
+			'actionSync'        => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
+			'actionDelete'      => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
+			'actionUpdate'      => $this->config['ajax_action_update'] ?? 'd4h_calendar_ajax_update',
+			'actionCheckUpdate' => $this->config['ajax_action_check_update'] ?? 'd4h_calendar_ajax_check_update',
 		) );
 	}
 
@@ -169,6 +175,102 @@ final class Admin {
 		}
 
 		wp_send_json_success( array( 'deleted' => $result ) );
+	}
+
+	/**
+	 * AJAX handler: Check only — whether a plugin update is available. Does not perform update.
+	 */
+	public function ajax_check_update(): void {
+		check_ajax_referer( 'd4h_calendar_admin', 'nonce' );
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
+		}
+
+		$repo = $this->config['update_github_repo'] ?? '';
+		if ( $repo === '' ) {
+			wp_send_json_error( array( 'message' => __( 'Plugin update source not configured.', 'd4h-calendar' ) ), 400 );
+		}
+
+		$plugin_file     = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
+		$current_version = D4H_CALENDAR_VERSION;
+		$updater         = new Plugin_Updater( $this->config, $plugin_file, $current_version );
+		$check           = $updater->check_update();
+
+		$message = '';
+		if ( $check['available'] ) {
+			$message = sprintf(
+				/* translators: %s: available version number */
+				__( 'Update available: version %s.', 'd4h-calendar' ),
+				$check['latest']
+			);
+		} elseif ( $check['latest'] !== null ) {
+			$message = sprintf(
+				/* translators: 1: current version, 2: latest version */
+				__( 'Already on the latest version (%1$s).', 'd4h-calendar' ),
+				$current_version,
+				$check['latest']
+			);
+		} else {
+			$message = __( 'Could not fetch update info. Check your server can reach GitHub.', 'd4h-calendar' );
+		}
+
+		wp_send_json_success( array(
+			'available' => $check['available'],
+			'current'   => $check['current'],
+			'latest'    => $check['latest'],
+			'message'   => $message,
+		) );
+	}
+
+	/**
+	 * AJAX handler: Perform plugin update (download and install newer version).
+	 */
+	public function ajax_update(): void {
+		check_ajax_referer( 'd4h_calendar_admin', 'nonce' );
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
+		}
+
+		$repo = $this->config['update_github_repo'] ?? '';
+		if ( $repo === '' ) {
+			wp_send_json_error( array( 'message' => __( 'Plugin update source not configured.', 'd4h-calendar' ) ), 400 );
+		}
+
+		$plugin_file     = plugin_basename( D4H_CALENDAR_PLUGIN_FILE );
+		$current_version = D4H_CALENDAR_VERSION;
+		$updater         = new Plugin_Updater( $this->config, $plugin_file, $current_version );
+		$check           = $updater->check_update();
+
+		if ( ! $check['available'] ) {
+			$message = $check['latest'] !== null
+				? sprintf(
+					/* translators: 1: current version, 2: latest version */
+					__( 'Already on the latest version (%1$s).', 'd4h-calendar' ),
+					$current_version,
+					$check['latest']
+				)
+				: __( 'Could not fetch update info. Check your server can reach GitHub.', 'd4h-calendar' );
+			wp_send_json_error( array( 'message' => $message ), 200 );
+		}
+
+		$package = $check['package'];
+		if ( empty( $package ) ) {
+			wp_send_json_error( array( 'message' => __( 'No update package URL found in release.', 'd4h-calendar' ) ), 400 );
+		}
+
+		$result = $updater->do_upgrade( $package );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
+		}
+
+		wp_send_json_success( array(
+			'message'       => sprintf(
+				/* translators: %s: new version number */
+				__( 'Plugin updated to version %s. Please refresh the page.', 'd4h-calendar' ),
+				$check['latest']
+			),
+			'new_version'   => $check['latest'],
+		) );
 	}
 
 	private function save_credentials(): void {
@@ -423,7 +525,11 @@ final class Admin {
 				<span id="d4h-last-updated"><?php echo $updated ? esc_html( wp_date( 'j M Y, H:i', $updated ) ) : esc_html__( 'Never', 'd4h-calendar' ); ?></span>
 			</p>
 			<p>
-				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Update now', 'd4h-calendar' ); ?></button>
+				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Retrieve Calendar data', 'd4h-calendar' ); ?></button>
+				<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
+					<button type="button" id="d4h-plugin-check-update" class="button button-secondary"><?php esc_html_e( 'Check for plugin update', 'd4h-calendar' ); ?></button>
+					<button type="button" id="d4h-plugin-update-now" class="button button-primary" style="display:none;"><?php esc_html_e( 'Update plugin now', 'd4h-calendar' ); ?></button>
+				<?php endif; ?>
 				<?php if ( ! empty( $this->config['enable_delete_btn'] ) ) : ?>
 					<?php $retention = (int) ( $this->config['retention_days'] ?? 90 ); ?>
 					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
