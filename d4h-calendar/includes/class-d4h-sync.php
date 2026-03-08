@@ -57,6 +57,12 @@ final class Sync {
 			return new \WP_Error( 'd4h_no_context', __( 'Could not determine API context. Set context and context ID in D4H Calendar settings.', 'd4h-calendar' ) );
 		}
 
+		$context    = $this->validate_context( $context );
+		$context_id = $this->validate_context_id( $context_id );
+		if ( $context === '' || $context_id === '' ) {
+			return new \WP_Error( 'd4h_invalid_context', __( 'Invalid API context. Context must be "team" or "organisation"; context ID must be alphanumeric.', 'd4h-calendar' ) );
+		}
+
 		$events = $this->api->get_events( $context, $context_id );
 		if ( is_wp_error( $events ) ) {
 			return $events;
@@ -122,6 +128,37 @@ final class Sync {
 	 * @param array<int, array<string, mixed>> $tags
 	 * @return array<int, string>
 	 */
+	/**
+	 * Validate API context. D4H supports 'team' or 'organisation'.
+	 *
+	 * @param string $context
+	 * @return string Valid context or empty string.
+	 */
+	private function validate_context( string $context ): string {
+		$context = strtolower( trim( $context ) );
+		if ( $context === 'team' || $context === 'organisation' ) {
+			return $context;
+		}
+		return '';
+	}
+
+	/**
+	 * Validate context ID to prevent path injection. Allows alphanumeric and hyphen.
+	 *
+	 * @param string $context_id
+	 * @return string Sanitized ID or empty string if invalid.
+	 */
+	private function validate_context_id( string $context_id ): string {
+		$context_id = trim( $context_id );
+		if ( $context_id === '' ) {
+			return '';
+		}
+		if ( preg_match( '/^[a-zA-Z0-9\-]+$/', $context_id ) ) {
+			return $context_id;
+		}
+		return '';
+	}
+
 	private function build_tags_map( array $tags ): array {
 		$map = array();
 		foreach ( $tags as $tag ) {

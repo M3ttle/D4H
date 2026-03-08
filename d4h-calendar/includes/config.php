@@ -55,7 +55,7 @@ function d4h_calendar_get_config() {
 
 		// Feature flags
 		'enable_cron'        => true,
-		'enable_delete_btn'  => true,
+		'enable_delete_btn'  => false,
 
 		// AJAX actions (admin-only)
 		'ajax_action_sync'   => 'd4h_calendar_ajax_sync',

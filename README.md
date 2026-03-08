@@ -17,7 +17,7 @@ WordPress plugin that fetches **events** and **exercises** from the D4H Team Man
 - **Sync**: Automatic sync via cron (events/exercises only; configurable interval) and manual “Update now” on the admin page (events, exercises, and tags).
 - **Admin page**: API credentials, sync interval, event colors (by type: event/exercise, or by tag; tag overrides type), last updated time, last sync status, sync history (latest 100 runs with time, status, source, duration, error), and “Delete data older than 90 days” (configurable retention).
 - **Calendar**: FullCalendar with month/week/day views, Icelandic locale, event details modal (title, time, type, description, tags). Height and locale configurable via `config.php`.
-- **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output.
+- **Security**: API credentials stored in options (not in config or repo); nonces and capability checks on AJAX; REST date validation and range limits; escaped output; API context validated (`team` or `organisation`) and context ID alphanumeric-only to prevent path injection.
 
 ---
 
@@ -51,7 +51,7 @@ The API token and optional context/contextId are saved from the admin form (neve
 | `includes/class-d4h-admin.php` | Settings page and AJAX actions |
 | `admin/admin.js` | Admin AJAX (Update now, Delete older) |
 | `assets/calendar.js` | Frontend FullCalendar init |
-| `uninstall.php` | Clears scheduled cron via `Cron::unschedule()` |
+| `uninstall.php` | On uninstall: clears scheduled cron, deletes all plugin options, drops the custom table |
 
 ---
 

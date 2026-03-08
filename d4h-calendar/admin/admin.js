@@ -11,7 +11,8 @@
 		var el = document.getElementById('d4h-admin-message');
 		if (!el) return;
 		el.className = 'notice notice-' + (type || 'info') + ' is-dismissible';
-		el.innerHTML = '<p>' + (text || '') + '</p>';
+		el.innerHTML = '<p></p>';
+		el.querySelector('p').textContent = text || '';
 		el.style.display = 'block';
 	}
 
