@@ -63,6 +63,7 @@ function d4h_calendar_get_config() {
 
 		// Self-update from GitHub releases via Plugins → Updates (owner/repo; empty to disable)
 		'update_github_repo' => 'M3ttle/D4H',
+		'option_github_token' => 'd4h_calendar_github_token', // Optional: increases API rate limit (60→5000/hour)
 
 		// Admin
 		'admin_capability'   => 'manage_options',

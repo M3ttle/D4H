@@ -42,13 +42,21 @@ final class Plugin_Updater {
 			return null;
 		}
 
-		$repo = ltrim( $repo, '/' );
-		$url  = 'https://api.github.com/repos/' . $repo . '/releases/latest';
+		$repo  = ltrim( $repo, '/' );
+		$url   = 'https://api.github.com/repos/' . $repo . '/releases/latest';
+		$token = $this->get_github_token();
 
-		$response = wp_remote_get( $url, array(
+		$request_args = array(
 			'timeout'    => 15,
 			'user-agent' => 'D4H-Calendar-WordPress-Plugin/' . $this->current_version,
-		) );
+		);
+		if ( $token !== '' ) {
+			$request_args['headers'] = array(
+				'Authorization' => 'token ' . $token,
+			);
+		}
+
+		$response = wp_remote_get( $url, $request_args );
 
 		if ( is_wp_error( $response ) ) {
 			return null;
@@ -78,6 +86,20 @@ final class Plugin_Updater {
 			'package' => $package,
 			'url'     => $info_url,
 		);
+	}
+
+	/**
+	 * Returns the GitHub token for API auth. Prefers wp-config constant over admin option.
+	 *
+	 * @return string
+	 */
+	private function get_github_token(): string {
+		if ( defined( 'D4H_CALENDAR_GITHUB_TOKEN' ) && is_string( D4H_CALENDAR_GITHUB_TOKEN ) ) {
+			return trim( D4H_CALENDAR_GITHUB_TOKEN );
+		}
+		$option_key = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
+		$token      = get_option( $option_key, '' );
+		return is_string( $token ) ? trim( $token ) : '';
 	}
 
 	/**

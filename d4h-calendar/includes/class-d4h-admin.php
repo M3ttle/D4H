@@ -76,6 +76,11 @@ final class Admin {
 				$this->save_colors();
 			}
 		}
+		if ( $action === 'save_github_token' ) {
+			if ( wp_verify_nonce( isset( $_POST['d4h_calendar_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_calendar_nonce'] ) ) : '', 'd4h_calendar_save_github_token' ) ) {
+				$this->save_github_token();
+			}
+		}
 	}
 
 	/**
@@ -236,6 +241,19 @@ final class Admin {
 		exit;
 	}
 
+	private function save_github_token(): void {
+		$option_key = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
+		$token      = isset( $_POST['d4h_github_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_github_token'] ) ) : '';
+		if ( $token !== '' ) {
+			update_option( $option_key, $token, false );
+		} else {
+			delete_option( $option_key );
+		}
+		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( 'options-general.php' ) );
+		wp_safe_redirect( $url );
+		exit;
+	}
+
 	private function save_colors(): void {
 		$option_event    = $this->config['option_event_color'] ?? 'd4h_calendar_event_color';
 		$option_exercise = $this->config['option_exercise_color'] ?? 'd4h_calendar_exercise_color';
@@ -344,6 +362,27 @@ final class Admin {
 					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
 				<?php endif; ?>
 			</p>
+			<?php if ( ! empty( $this->config['update_github_repo'] ) ) : ?>
+				<?php
+				$option_github   = $this->config['option_github_token'] ?? 'd4h_calendar_github_token';
+				$has_const_token = defined( 'D4H_CALENDAR_GITHUB_TOKEN' );
+				$has_opt_token   = ! $has_const_token && get_option( $option_github, '' ) !== '';
+				?>
+				<p style="margin-top: 1em;">
+					<button type="button" id="d4h-github-token-toggle" class="button-link" aria-expanded="false" aria-controls="d4h-github-token-form">
+						<span class="d4h-toggle-show"><?php esc_html_e( 'Show GitHub API token', 'd4h-calendar' ); ?></span>
+						<span class="d4h-toggle-hide" style="display:none;"><?php esc_html_e( 'Hide GitHub API token', 'd4h-calendar' ); ?></span>
+					</button>
+				</p>
+				<form id="d4h-github-token-form" method="post" action="" style="margin-top: 0.5em; display:none;" aria-hidden="true">
+					<?php wp_nonce_field( 'd4h_calendar_save_github_token', 'd4h_calendar_nonce' ); ?>
+					<input type="hidden" name="d4h_calendar_action" value="save_github_token" />
+					<label for="d4h_github_token"><?php esc_html_e( 'GitHub API token (optional)', 'd4h-calendar' ); ?></label>
+					<input type="password" id="d4h_github_token" name="d4h_github_token" value="" class="regular-text" autocomplete="off" placeholder="<?php echo $has_const_token ? esc_attr__( 'Set via wp-config.php', 'd4h-calendar' ) : ( $has_opt_token ? esc_attr__( 'Token saved — enter new to replace', 'd4h-calendar' ) : '' ); ?>" <?php echo $has_const_token ? ' readonly' : ''; ?> />
+					<button type="submit" class="button button-secondary"<?php echo $has_const_token ? ' disabled' : ''; ?>><?php esc_attr_e( 'Save', 'd4h-calendar' ); ?></button>
+					<p class="description"><?php esc_html_e( 'Increases rate limit from 60 to 5,000 requests/hour. Create at GitHub → Settings → Developer settings → Personal access tokens. No extra scopes needed for public repos.', 'd4h-calendar' ); ?> <?php echo $has_opt_token ? ' ' . esc_html__( 'Leave empty and save to remove.', 'd4h-calendar' ) : ''; ?></p>
+				</form>
+			<?php endif; ?>
 			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
 
 			<h3><?php esc_html_e( 'Sync history', 'd4h-calendar' ); ?></h3>

@@ -72,6 +72,22 @@
 		});
 	}
 
+	// GitHub token show/hide toggle (default hidden)
+	var githubToggle = document.getElementById('d4h-github-token-toggle');
+	var githubForm = document.getElementById('d4h-github-token-form');
+	if (githubToggle && githubForm) {
+		var showLabel = githubToggle.querySelector('.d4h-toggle-show');
+		var hideLabel = githubToggle.querySelector('.d4h-toggle-hide');
+		githubToggle.addEventListener('click', function () {
+			var hidden = githubForm.style.display === 'none';
+			githubForm.style.display = hidden ? 'block' : 'none';
+			githubForm.setAttribute('aria-hidden', hidden ? 'false' : 'true');
+			githubToggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
+			if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
+			if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
+		});
+	}
+
 	// Sync color picker with hex text display (bidirectional)
 	document.querySelectorAll('input[type="color"]').forEach(function (picker) {
 		picker.addEventListener('input', function () {
