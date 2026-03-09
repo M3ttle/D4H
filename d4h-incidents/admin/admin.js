@@ -142,7 +142,7 @@
 		}
 
 		var labels = data.labels;
-		var incidentsData = data.incidents || [];
+		var incidentsData = (data.incidents || []).map(function (v) { return parseInt(v, 10) || 0; });
 
 		if (charts['incidents-by-period']) charts['incidents-by-period'].destroy();
 		charts['incidents-by-period'] = new Chart(ctx, {
@@ -155,7 +155,7 @@
 				responsive: true,
 				scales: {
 					x: { ticks: { maxRotation: 45 } },
-					y: { beginAtZero: true }
+					y: { beginAtZero: true, stepSize: 1, ticks: { precision: 0 } }
 				}
 			}
 		});
@@ -173,9 +173,10 @@
 		}
 
 		var labels = data.labels;
-		var incidentsData = data.incidents || [];
-		var totalParticipantsData = data.participants || [];
-		var uniqueParticipantsData = data.unique_participants || [];
+		var toInt = function (v) { return parseInt(v, 10) || 0; };
+		var incidentsData = (data.incidents || []).map(toInt);
+		var totalParticipantsData = (data.participants || []).map(toInt);
+		var uniqueParticipantsData = (data.unique_participants || []).map(function (v) { return v != null ? toInt(v) : 0; });
 
 		if (charts.participants) charts.participants.destroy();
 		charts.participants = new Chart(ctxPart, {
@@ -192,7 +193,7 @@
 				responsive: true,
 				scales: {
 					x: { ticks: { maxRotation: 45 } },
-					y: { beginAtZero: true }
+					y: { beginAtZero: true, stepSize: 1, ticks: { precision: 0 } }
 				}
 			}
 		});
@@ -215,7 +216,7 @@
 			var allData = processed.incidents_per_member_data;
 			var sliceCount = limit >= allIds.length ? allIds.length : limit;
 			labels = allIds.slice(0, sliceCount).map(getMemberLabel);
-			data = allData.slice(0, sliceCount);
+			data = allData.slice(0, sliceCount).map(function (v) { return parseInt(v, 10) || 0; });
 		}
 
 		if (charts['incidents-per-member']) charts['incidents-per-member'].destroy();
@@ -230,7 +231,7 @@
 				plugins: { legend: { display: false } },
 				scales: {
 					x: { ticks: { maxRotation: 90, minRotation: 45 } },
-					y: { beginAtZero: true }
+					y: { beginAtZero: true, stepSize: 1, ticks: { precision: 0 } }
 				}
 			}
 		});
@@ -306,45 +307,6 @@
 		renderIncidentsByPeriodChart(processed);
 		renderParticipantsChart(processed);
 		renderIncidentsPerMemberChart(processed);
-
-		var mh = processed.chart_month_hour;
-		var ctxMH = document.getElementById('d4h-chart-month-hour');
-		if (ctxMH && mh && mh.data) {
-			var months = mh.months || [];
-			var incidentByMonth = [];
-			var participantByMonth = [];
-			var hourLabels = mh.hours ? mh.hours.map(function (h) { return h + ':00'; }) : [];
-			var incidentByHour = new Array(24).fill(0);
-			months.forEach(function (month) {
-				var incTotal = 0;
-				var partTotal = 0;
-				(mh.hours || []).forEach(function (hour) {
-					var key = month + '-' + hour;
-					var d = mh.data[key] || {};
-					var inc = d.incidents || 0;
-					var part = d.participants || 0;
-					incTotal += inc;
-					partTotal += part;
-					incidentByHour[hour] = (incidentByHour[hour] || 0) + inc;
-				});
-				incidentByMonth.push(incTotal);
-				participantByMonth.push(partTotal);
-			});
-			charts['month-hour'] = new Chart(ctxMH, {
-				type: 'bar',
-				data: {
-					labels: months.length ? months : hourLabels.slice(0, 24),
-					datasets: [
-						{ label: 'Incidents', data: months.length ? incidentByMonth : incidentByHour, backgroundColor: '#3788d8' },
-						{ label: 'Participants', data: months.length ? participantByMonth : [], backgroundColor: '#28a745' }
-					]
-				},
-				options: {
-					responsive: true,
-					scales: { x: { ticks: { maxRotation: 45 } }, y: { beginAtZero: true } }
-				}
-			});
-		}
 	}
 
 	function fetchData() {
@@ -464,48 +426,6 @@
 			rows.push(['Member ID', 'Incident count']);
 			for (var k = 0; k < memberLabels.length; k++) {
 				rows.push([memberLabels[k], memberData[k] || 0]);
-			}
-		} else if (chartId === 'month-hour') {
-			var mh = processed.chart_month_hour;
-			if (!mh || !mh.data) return;
-			var months = mh.months || [];
-			var hourLabels = mh.hours ? mh.hours.map(function (h) { return h + ':00'; }) : [];
-			var labels = months.length ? months : hourLabels.slice(0, 24);
-			var incidentData = [];
-			var participantData = [];
-			if (months.length) {
-				labels.forEach(function (month) {
-					var incTotal = 0;
-					var partTotal = 0;
-					(mh.hours || []).forEach(function (hour) {
-						var key = month + '-' + hour;
-						var d = mh.data[key] || {};
-						incTotal += d.incidents || 0;
-						partTotal += d.participants || 0;
-					});
-					incidentData.push(incTotal);
-					participantData.push(partTotal);
-				});
-				rows.push(['Period', 'Incidents', 'Participants']);
-				for (var k = 0; k < labels.length; k++) {
-					rows.push([labels[k], incidentData[k], participantData[k]]);
-				}
-			} else {
-				labels.forEach(function (label, idx) {
-					var hour = idx;
-					var incTotal = 0;
-					Object.keys(mh.data || {}).forEach(function (key) {
-						var parts = key.split('-');
-						if (parts.length >= 3 && parseInt(parts[parts.length - 1], 10) === hour) {
-							incTotal += (mh.data[key].incidents || 0);
-						}
-					});
-					incidentData.push(incTotal);
-				});
-				rows.push(['Hour', 'Incidents']);
-				for (var k = 0; k < labels.length; k++) {
-					rows.push([labels[k], incidentData[k]]);
-				}
 			}
 		} else {
 			return;

@@ -216,8 +216,8 @@ final class Admin {
 	}
 
 	/**
-	 * AJAX handler: Fetch first names for member IDs.
-	 * Uses last fetch context. Returns map of member_id => first_name.
+	 * AJAX handler: Fetch names for member IDs.
+	 * Uses last fetch context. Returns map of member_id => first two names (split on space).
 	 */
 	public function ajax_fetch_member_names(): void {
 		check_ajax_referer( 'd4h_incidents_admin', 'nonce' );
@@ -269,9 +269,13 @@ final class Admin {
 				continue;
 			}
 			$full_name = isset( $member['name'] ) ? trim( (string) $member['name'] ) : '';
-			$parts     = $full_name !== '' ? preg_split( '/\s+/', $full_name, 2 ) : array();
-			$first     = isset( $parts[0] ) ? trim( $parts[0] ) : '';
-			$names[ (string) $member_id ] = $first !== '' ? $first : (string) $member_id;
+			if ( $full_name === 'Jón Pétur Jónsson' ) {
+				$names[ (string) $member_id ] = 'Nonni';
+				continue;
+			}
+			$parts     = $full_name !== '' ? preg_split( '/\s+/', $full_name, 3 ) : array();
+			$first_two = isset( $parts[0] ) ? implode( ' ', array_slice( array_map( 'trim', $parts ), 0, 2 ) ) : '';
+			$names[ (string) $member_id ] = $first_two !== '' ? $first_two : (string) $member_id;
 		}
 
 		wp_send_json_success( array( 'names' => $names ) );
@@ -849,18 +853,6 @@ final class Admin {
 						<div class="d4h-chart-export-buttons">
 							<button type="button" class="button d4h-export-png" data-chart="incidents-per-member"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
 							<button type="button" class="button d4h-export-csv" data-chart="incidents-per-member"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
-						</div>
-					</div>
-				</div>
-
-				<div class="d4h-chart-section">
-					<h3><?php esc_html_e( 'Incidents by month and hour', 'd4h-incidents' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'Heatmap of incidents and participants over time.', 'd4h-incidents' ); ?></p>
-					<div class="d4h-chart-container">
-						<canvas id="d4h-chart-month-hour"></canvas>
-						<div class="d4h-chart-export-buttons">
-							<button type="button" class="button d4h-export-png" data-chart="month-hour"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
-							<button type="button" class="button d4h-export-csv" data-chart="month-hour"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
 						</div>
 					</div>
 				</div>
