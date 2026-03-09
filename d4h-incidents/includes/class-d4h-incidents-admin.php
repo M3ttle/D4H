@@ -132,9 +132,8 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-incidents' ) ), 400 );
 		}
 
-		$from          = isset( $_POST['from'] ) ? sanitize_text_field( wp_unslash( $_POST['from'] ) ) : '';
-		$to            = isset( $_POST['to'] ) ? sanitize_text_field( wp_unslash( $_POST['to'] ) ) : '';
-		$resource_type = isset( $_POST['resource_type'] ) ? sanitize_text_field( wp_unslash( $_POST['resource_type'] ) ) : 'Incident';
+		$from = isset( $_POST['from'] ) ? sanitize_text_field( wp_unslash( $_POST['from'] ) ) : '';
+		$to   = isset( $_POST['to'] ) ? sanitize_text_field( wp_unslash( $_POST['to'] ) ) : '';
 
 		$default_days = (int) ( $this->config['default_range_days'] ?? 365 );
 		if ( $from === '' ) {
@@ -148,10 +147,6 @@ final class Admin {
 		$to_ts   = strtotime( $to );
 		if ( ! $from_ts || ! $to_ts || $from_ts > $to_ts ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid date range.', 'd4h-incidents' ) ), 400 );
-		}
-
-		if ( ! in_array( $resource_type, array( 'Event', 'Exercise', 'Incident' ), true ) ) {
-			$resource_type = 'Incident';
 		}
 
 		$api = new API_Client( $this->config, $token );
@@ -179,9 +174,8 @@ final class Admin {
 		}
 
 		$incidents = $api->get_incidents( $context, $context_id, array(
-			'after'         => gmdate( 'Y-m-d', $from_ts ) . 'T00:00:00Z',
-			'before'        => gmdate( 'Y-m-d', $to_ts ) . 'T23:59:59Z',
-			'resource_type' => $resource_type,
+			'after'  => gmdate( 'Y-m-d', $from_ts ) . 'T00:00:00Z',
+			'before' => gmdate( 'Y-m-d', $to_ts ) . 'T23:59:59Z',
 		) );
 
 		if ( is_wp_error( $incidents ) ) {
@@ -190,7 +184,7 @@ final class Admin {
 
 		$processed = $this->process_incidents( $incidents, $api, $context, $context_id );
 
-		$transient_key = 'd4h_incidents_data_' . md5( $from . $to . $resource_type );
+		$transient_key = 'd4h_incidents_data_' . md5( $from . $to );
 		set_transient( $transient_key, array(
 			'from'      => $from,
 			'to'        => $to,
@@ -204,7 +198,6 @@ final class Admin {
 			'to'            => $to,
 		), false );
 
-		$processed['resource_type'] = $resource_type;
 		wp_send_json_success( $processed );
 	}
 
@@ -500,12 +493,6 @@ final class Admin {
 					<input type="date" id="d4h_incidents_from" value="<?php echo esc_attr( gmdate( 'Y-m-d', strtotime( "-{$default_days} days" ) ) ); ?>" />
 					<label for="d4h_incidents_to"><?php esc_html_e( 'To:', 'd4h-incidents' ); ?></label>
 					<input type="date" id="d4h_incidents_to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>" />
-					<label for="d4h_incidents_resource_type"><?php esc_html_e( 'Type:', 'd4h-incidents' ); ?></label>
-					<select id="d4h_incidents_resource_type">
-						<option value="Incident" selected><?php esc_html_e( 'Incident', 'd4h-incidents' ); ?></option>
-						<option value="Event"><?php esc_html_e( 'Event', 'd4h-incidents' ); ?></option>
-						<option value="Exercise"><?php esc_html_e( 'Exercise', 'd4h-incidents' ); ?></option>
-					</select>
 					<button type="button" id="d4h-incidents-fetch" class="button button-primary"><?php esc_html_e( 'Fetch data', 'd4h-incidents' ); ?></button>
 					<span id="d4h-incidents-presets">
 						<button type="button" class="button button-small d4h-preset" data-days="7"><?php esc_html_e( '7 days', 'd4h-incidents' ); ?></button>
@@ -523,7 +510,7 @@ final class Admin {
 				<div class="d4h-incidents-stats-cards">
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-incidents">0</span>
-						<span class="d4h-stat-label" id="d4h-stat-incidents-label"><?php esc_html_e( 'Total incidents', 'd4h-incidents' ); ?></span>
+						<span class="d4h-stat-label"><?php esc_html_e( 'Total incidents', 'd4h-incidents' ); ?></span>
 					</div>
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-participants">0</span>
@@ -535,11 +522,11 @@ final class Admin {
 					</div>
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-avg-participants">0</span>
-						<span class="d4h-stat-label" id="d4h-stat-avg-label"><?php esc_html_e( 'Avg participants per incident', 'd4h-incidents' ); ?></span>
+						<span class="d4h-stat-label"><?php esc_html_e( 'Avg participants per incident', 'd4h-incidents' ); ?></span>
 					</div>
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-avg-duration">0m</span>
-						<span class="d4h-stat-label" id="d4h-stat-avg-duration-label"><?php esc_html_e( 'Avg duration per incident', 'd4h-incidents' ); ?></span>
+						<span class="d4h-stat-label"><?php esc_html_e( 'Avg duration per incident', 'd4h-incidents' ); ?></span>
 					</div>
 				</div>
 

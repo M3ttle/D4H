@@ -31,11 +31,11 @@ final class API_Client {
 	}
 
 	/**
-	 * Get incidents (paginated). Uses v3/team/{id}/incidents with date and resource_type filters.
+	 * Get incidents (paginated). Uses v3/team/{id}/incidents with date filters.
 	 *
 	 * @param string               $context    'team' or 'organisation'
 	 * @param string               $context_id Context ID (e.g. 434)
-	 * @param array<string, mixed> $args       Optional: after, before, resource_type, page, size
+	 * @param array<string, mixed> $args       Optional: after, before, page, size
 	 * @return array<int, array<string, mixed>>|\WP_Error
 	 */
 	public function get_incidents( string $context, string $context_id, array $args = array() ) {
@@ -46,9 +46,6 @@ final class API_Client {
 		}
 		if ( ! empty( $args['before'] ) ) {
 			$query['before'] = $args['before'];
-		}
-		if ( ! empty( $args['resource_type'] ) && in_array( $args['resource_type'], array( 'Event', 'Exercise', 'Incident' ), true ) ) {
-			$query['resource_type'] = $args['resource_type'];
 		}
 		$query['page'] = $args['page'] ?? 0;
 		$query['size'] = $args['size'] ?? 100;

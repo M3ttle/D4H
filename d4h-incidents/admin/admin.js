@@ -15,12 +15,6 @@
 	var sortColumn = 'date';
 	var sortAsc = false;
 
-	var resourceTypeLabels = {
-		Incident: { total: 'Total incidents', avgPer: 'Avg participants per incident', avgDuration: 'Avg duration per incident' },
-		Event: { total: 'Total events', avgPer: 'Avg participants per event', avgDuration: 'Avg duration per event' },
-		Exercise: { total: 'Total exercises', avgPer: 'Avg participants per exercise', avgDuration: 'Avg duration per exercise' }
-	};
-
 	function showMessage(text, type) {
 		var el = document.getElementById('d4h-incidents-message');
 		if (!el) return;
@@ -127,15 +121,6 @@
 		destroyCharts();
 		lastProcessed = processed;
 
-		var resourceType = (processed.resource_type || 'Incident');
-		var labels = resourceTypeLabels[resourceType] || resourceTypeLabels.Incident;
-		var incidentsLabelEl = document.getElementById('d4h-stat-incidents-label');
-		var avgLabelEl = document.getElementById('d4h-stat-avg-label');
-		var avgDurationLabelEl = document.getElementById('d4h-stat-avg-duration-label');
-		if (incidentsLabelEl) incidentsLabelEl.textContent = labels.total;
-		if (avgLabelEl) avgLabelEl.textContent = labels.avgPer;
-		if (avgDurationLabelEl) avgDurationLabelEl.textContent = labels.avgDuration;
-
 		document.getElementById('d4h-stat-incidents').textContent = (processed.stats && processed.stats.total_incidents) || 0;
 		document.getElementById('d4h-stat-participants').textContent = (processed.stats && processed.stats.total_participants) || 0;
 		var durationEl = document.getElementById('d4h-stat-duration');
@@ -222,10 +207,8 @@
 	function fetchData() {
 		var fromInput = document.getElementById('d4h_incidents_from');
 		var toInput = document.getElementById('d4h_incidents_to');
-		var resourceTypeSelect = document.getElementById('d4h_incidents_resource_type');
 		var from = fromInput ? fromInput.value : '';
 		var to = toInput ? toInput.value : '';
-		var resourceType = resourceTypeSelect ? (resourceTypeSelect.value || 'Incident') : 'Incident';
 
 		hideMessage();
 		setLoading(true);
@@ -235,7 +218,6 @@
 		formData.append('nonce', nonce);
 		formData.append('from', from);
 		formData.append('to', to);
-		formData.append('resource_type', resourceType);
 
 		fetch(ajaxUrl, {
 			method: 'POST',
