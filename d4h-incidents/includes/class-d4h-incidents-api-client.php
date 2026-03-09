@@ -53,6 +53,20 @@ final class API_Client {
 	}
 
 	/**
+	 * Get tags for the context. Returns array of tag objects (id, name, etc.).
+	 * Reuses same endpoint as D4H Calendar for consistent tag list.
+	 *
+	 * @param string               $context    'team' or 'organisation'
+	 * @param string               $context_id Context ID
+	 * @param array<string, mixed> $args       Optional: page, size
+	 * @return array<int, array<string, mixed>>|\WP_Error
+	 */
+	public function get_tags( string $context, string $context_id, array $args = array() ) {
+		$path = sprintf( '/v3/%s/%s/tags', $context, $context_id );
+		return $this->fetch_paginated( $path, $args );
+	}
+
+	/**
 	 * Get current user/context info.
 	 *
 	 * @return array{context?: string, id?: string}|null|\WP_Error

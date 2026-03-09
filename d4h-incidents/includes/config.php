@@ -35,8 +35,9 @@ function d4h_incidents_get_config() {
 		// AJAX actions
 		'ajax_action_fetch'        => 'd4h_incidents_ajax_fetch',
 		'ajax_action_member_names' => 'd4h_incidents_ajax_fetch_member_names',
-		'ajax_action_export_excel' => 'd4h_incidents_ajax_export_excel',
-		'ajax_action_export_png'   => 'd4h_incidents_ajax_export_png',
+		'ajax_action_export_excel'        => 'd4h_incidents_ajax_export_excel',
+		'ajax_action_export_png'          => 'd4h_incidents_ajax_export_png',
+		'ajax_action_export_report_by_tags' => 'd4h_incidents_ajax_export_report_by_tags',
 
 		// Self-update from GitHub (same repo as calendar)
 		'update_github_repo' => 'M3ttle/D4H',

@@ -8,6 +8,7 @@
 	var actionMemberNames = cfg.actionMemberNames || 'd4h_incidents_ajax_fetch_member_names';
 	var actionExportExcel = cfg.actionExportExcel || 'd4h_incidents_ajax_export_excel';
 	var actionExportPng = cfg.actionExportPng || 'd4h_incidents_ajax_export_png';
+	var actionExportReportByTags = cfg.actionExportReportByTags || 'd4h_incidents_ajax_export_report_by_tags';
 
 	var charts = {};
 	var lastProcessed = null;
@@ -16,6 +17,7 @@
 	var perPage = 10;
 	var sortColumn = 'date';
 	var sortAsc = false;
+	var NO_TAG_VALUE = '__no_tag__';
 
 	function showMessage(text, type) {
 		var el = document.getElementById('d4h-incidents-message');
@@ -42,6 +44,49 @@
 		return String(text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 	}
 
+	function getSelectedTagIds() {
+		var checkboxes = document.querySelectorAll('#d4h-incidents-tag-checkboxes input.d4h-tag-filter-cb:checked');
+		var ids = [];
+		checkboxes.forEach(function (cb) {
+			var val = cb.getAttribute('data-tag-id');
+			if (val) ids.push(val);
+		});
+		return ids;
+	}
+
+	function renderTagFilter(processed) {
+		var container = document.getElementById('d4h-incidents-tag-filter');
+		var checkboxesWrap = document.getElementById('d4h-incidents-tag-checkboxes');
+		if (!container || !checkboxesWrap) return;
+		var allTags = (processed && processed.all_tags) || [];
+		var hasTags = allTags.length > 0;
+		var hasNoTagInData = (processed && processed.stats && processed.stats.incidents_list || []).some(function (item) {
+			return !(item.tag_ids && item.tag_ids.length > 0);
+		});
+		if (!hasTags && !hasNoTagInData) {
+			container.style.display = 'none';
+			return;
+		}
+		container.style.display = 'block';
+		var html = '';
+		if (hasNoTagInData) {
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '" checked /> No tag</label>';
+		}
+		var sortedTags = allTags.slice().sort(function (a, b) {
+			var nameA = String(a.name || a.id || '');
+			var nameB = String(b.name || b.id || '');
+			return nameA.localeCompare(nameB);
+		});
+		sortedTags.forEach(function (tag) {
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(String(tag.id)) + '" checked /> ' + escapeHtml(tag.name || String(tag.id)) + '</label>';
+		});
+		checkboxesWrap.innerHTML = html;
+	}
+
+	function getIncidentsList(processed) {
+		return (processed && processed.stats && processed.stats.incidents_list) || [];
+	}
+
 	function sortIncidentsList(list) {
 		var sorted = list.slice();
 		var key = sortColumn;
@@ -49,6 +94,11 @@
 		sorted.sort(function (a, b) {
 			var va = a[key];
 			var vb = b[key];
+			if (key === 'tag_names') {
+				va = (Array.isArray(va) ? va : []).join(', ');
+				vb = (Array.isArray(vb) ? vb : []).join(', ');
+				return asc ? (va.localeCompare(vb)) : (vb.localeCompare(va));
+			}
 			if (key === 'name' || key === 'title' || key === 'date' || key === 'location_coords') {
 				va = String(va || '');
 				vb = String(vb || '');
@@ -62,7 +112,7 @@
 	}
 
 	function renderIncidentsTable(processed) {
-		var incidentsList = (processed && processed.stats && processed.stats.incidents_list) || [];
+		var incidentsList = getIncidentsList(processed);
 		var tableBody = document.getElementById('d4h-incidents-table-body');
 		var perPageSelect = document.getElementById('d4h-incidents-per-page');
 		if (perPageSelect) perPage = parseInt(perPageSelect.value, 10) || 10;
@@ -78,7 +128,7 @@
 
 		if (tableBody) {
 			if (pageItems.length === 0) {
-				tableBody.innerHTML = '<tr><td colspan="6">' + (incidentsList.length === 0 ? 'No incidents.' : '') + '</td></tr>';
+				tableBody.innerHTML = '<tr><td colspan="7">' + (incidentsList.length === 0 ? 'No incidents.' : '') + '</td></tr>';
 			} else {
 				tableBody.innerHTML = pageItems.map(function (item) {
 					var date = item.date || '';
@@ -87,9 +137,10 @@
 					var locationCell = locationUrl ? '<a href="' + escapeHtml(locationUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(locationCoords) + '</a>' : '-';
 					var title = escapeHtml(item.title || item.name || '');
 					var description = escapeHtml(item.description || '');
+					var tagNames = (item.tag_names || []).join(', ') || '—';
 					var duration = item.duration || '';
 					var participantsCount = (item.participants != null) ? Number(item.participants) : 0;
-					return '<tr><td>' + date + '</td><td>' + locationCell + '</td><td>' + title + '</td><td>' + description + '</td><td>' + duration + '</td><td>' + participantsCount + '</td></tr>';
+					return '<tr><td>' + date + '</td><td>' + locationCell + '</td><td>' + title + '</td><td>' + description + '</td><td>' + escapeHtml(tagNames) + '</td><td>' + duration + '</td><td>' + participantsCount + '</td></tr>';
 				}).join('');
 			}
 		}
@@ -204,6 +255,73 @@
 		return (firstName != null && firstName !== '') ? firstName : String(memberId);
 	}
 
+	function renderIncidentsPerTagBoxes(processed) {
+		var container = document.getElementById('d4h-incidents-per-tag-boxes');
+		var section = document.getElementById('d4h-incidents-per-tag-cards');
+		if (!container || !section) return;
+		var perTag = (processed && processed.incidents_per_tag) || [];
+		if (perTag.length === 0) {
+			section.style.display = 'none';
+			return;
+		}
+		section.style.display = 'block';
+		container.innerHTML = perTag.map(function (item) {
+			return '<div class="d4h-stat-card"><span class="d4h-stat-value">' + escapeHtml(String(item.count || 0)) + '</span><span class="d4h-stat-label">' + escapeHtml(item.name || String(item.id)) + '</span></div>';
+		}).join('');
+	}
+
+	function renderIncidentsPerTagByPeriodChart(processed) {
+		var ctx = document.getElementById('d4h-chart-incidents-per-tag-by-period');
+		if (!ctx || !processed || !processed.incidents_per_tag_over_time) return;
+
+		var period = getParticipantsPeriod();
+		var data = processed.incidents_per_tag_over_time[period];
+		if (!data || !data.labels || !data.labels.length) {
+			if (charts['incidents-per-tag-by-period']) {
+				charts['incidents-per-tag-by-period'].destroy();
+				charts['incidents-per-tag-by-period'] = null;
+			}
+			return;
+		}
+
+		var labels = data.labels;
+		var tagsData = data.tags || {};
+		var tagKeys = Object.keys(tagsData);
+		if (tagKeys.length === 0) {
+			if (charts['incidents-per-tag-by-period']) {
+				charts['incidents-per-tag-by-period'].destroy();
+				charts['incidents-per-tag-by-period'] = null;
+			}
+			return;
+		}
+
+		var colors = ['#3788d8', '#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6f42c1', '#e83e8c', '#fd7e14'];
+		var datasets = tagKeys.map(function (tagKey, index) {
+			var tagInfo = tagsData[tagKey];
+			var seriesData = (tagInfo.data || []).map(function (v) { return parseInt(v, 10) || 0; });
+			return {
+				label: tagInfo.name || tagKey,
+				data: seriesData,
+				backgroundColor: colors[index % colors.length],
+				borderColor: colors[index % colors.length],
+				borderWidth: 1
+			};
+		});
+
+		if (charts['incidents-per-tag-by-period']) charts['incidents-per-tag-by-period'].destroy();
+		charts['incidents-per-tag-by-period'] = new Chart(ctx, {
+			type: 'bar',
+			data: { labels: labels, datasets: datasets },
+			options: {
+				responsive: true,
+				scales: {
+					x: { ticks: { maxRotation: 45 } },
+					y: { beginAtZero: true, stepSize: 1, stacked: false, ticks: { precision: 0 } }
+				}
+			}
+		});
+	}
+
 	function renderIncidentsPerMemberChart(processed) {
 		var ctx = document.getElementById('d4h-chart-incidents-per-member');
 		if (!ctx) return;
@@ -302,10 +420,13 @@
 		document.getElementById('d4h-incidents-results').style.display = 'block';
 
 		currentPage = 1;
+		renderTagFilter(processed);
 		renderIncidentsTable(processed);
 
+		renderIncidentsPerTagBoxes(processed);
 		renderIncidentsByPeriodChart(processed);
 		renderParticipantsChart(processed);
+		renderIncidentsPerTagByPeriodChart(processed);
 		renderIncidentsPerMemberChart(processed);
 	}
 
@@ -323,6 +444,8 @@
 		formData.append('nonce', nonce);
 		formData.append('from', from);
 		formData.append('to', to);
+		var selectedTagIds = getSelectedTagIds();
+		selectedTagIds.forEach(function (id) { formData.append('tag_ids[]', id); });
 
 		fetch(ajaxUrl, {
 			method: 'POST',
@@ -366,6 +489,37 @@
 					link.click();
 					URL.revokeObjectURL(link.href);
 					showMessage('Excel (CSV) downloaded.', 'success');
+				} else {
+					showMessage((data.data && data.data.message) || 'Export failed.', 'error');
+				}
+			})
+			.catch(function () {
+				showMessage('Export request failed.', 'error');
+			});
+	}
+
+	function exportReportByTags() {
+		var selectedTagIds = getSelectedTagIds();
+		var formData = new FormData();
+		formData.append('action', actionExportReportByTags);
+		formData.append('nonce', nonce);
+		selectedTagIds.forEach(function (id) { formData.append('tag_ids[]', id); });
+
+		fetch(ajaxUrl, {
+			method: 'POST',
+			body: formData,
+			credentials: 'same-origin'
+		})
+			.then(function (r) { return r.json(); })
+			.then(function (data) {
+				if (data.success && data.data && data.data.csv && data.data.filename) {
+					var blob = new Blob([data.data.csv], { type: 'text/csv;charset=utf-8;' });
+					var link = document.createElement('a');
+					link.href = URL.createObjectURL(blob);
+					link.download = data.data.filename;
+					link.click();
+					URL.revokeObjectURL(link.href);
+					showMessage('Report (filtered by tags) downloaded.', 'success');
 				} else {
 					showMessage((data.data && data.data.message) || 'Export failed.', 'error');
 				}
@@ -427,6 +581,21 @@
 			for (var k = 0; k < memberLabels.length; k++) {
 				rows.push([memberLabels[k], memberData[k] || 0]);
 			}
+		} else if (chartId === 'incidents-per-tag-by-period') {
+			var period = getParticipantsPeriod();
+			var data = processed.incidents_per_tag_over_time && processed.incidents_per_tag_over_time[period];
+			var labels = (data && data.labels) || [];
+			var tagsData = (data && data.tags) || {};
+			var tagKeys = Object.keys(tagsData);
+			var header = ['Period'].concat(tagKeys.map(function (k) { return tagsData[k].name || k; }));
+			rows.push(header);
+			for (var t = 0; t < labels.length; t++) {
+				var row = [labels[t]];
+				tagKeys.forEach(function (k) {
+					row.push(tagsData[k].data && tagsData[k].data[t] != null ? tagsData[k].data[t] : 0);
+				});
+				rows.push(row);
+			}
 		} else {
 			return;
 		}
@@ -451,6 +620,13 @@
 			perPage = parseInt(perPageSelect.value, 10) || 10;
 			currentPage = 1;
 			if (lastProcessed) renderIncidentsTable(lastProcessed);
+		});
+
+		document.querySelector('.d4h-tag-select-all') && document.querySelector('.d4h-tag-select-all').addEventListener('click', function () {
+			document.querySelectorAll('#d4h-incidents-tag-checkboxes input.d4h-tag-filter-cb').forEach(function (cb) { cb.checked = true; });
+		});
+		document.querySelector('.d4h-tag-select-none') && document.querySelector('.d4h-tag-select-none').addEventListener('click', function () {
+			document.querySelectorAll('#d4h-incidents-tag-checkboxes input.d4h-tag-filter-cb').forEach(function (cb) { cb.checked = false; });
 		});
 
 		document.querySelectorAll('.d4h-sortable').forEach(function (th) {
@@ -502,6 +678,7 @@
 				if (lastProcessed) {
 					renderIncidentsByPeriodChart(lastProcessed);
 					renderParticipantsChart(lastProcessed);
+					renderIncidentsPerTagByPeriodChart(lastProcessed);
 				}
 			});
 		}
@@ -523,6 +700,9 @@
 
 		var exportCsvBtn = document.getElementById('d4h-incidents-export-csv');
 		if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportExcel);
+
+		var exportReportTagsBtn = document.getElementById('d4h-incidents-export-report-tags');
+		if (exportReportTagsBtn) exportReportTagsBtn.addEventListener('click', exportReportByTags);
 
 		document.querySelectorAll('.d4h-export-png').forEach(function (btn) {
 			btn.addEventListener('click', function () {
