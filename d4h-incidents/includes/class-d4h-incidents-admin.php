@@ -109,6 +109,20 @@ final class Admin {
 			true
 		);
 
+		$tags_map = array();
+		if ( function_exists( 'd4h_core_get_tags_map' ) ) {
+			$tags_map = d4h_core_get_tags_map();
+		}
+		if ( empty( $tags_map ) ) {
+			$tags_map = get_option( 'd4h_core_tags_map', array() );
+		}
+		$initial_tags = array();
+		if ( is_array( $tags_map ) ) {
+			foreach ( $tags_map as $id => $name ) {
+				$initial_tags[] = array( 'id' => $id, 'name' => $name );
+			}
+		}
+
 		wp_localize_script( 'd4h-incidents-admin', 'd4hIncidentsAdmin', array(
 			'ajaxUrl'                  => admin_url( 'admin-ajax.php' ),
 			'nonce'                    => wp_create_nonce( 'd4h_incidents_admin' ),
@@ -117,6 +131,7 @@ final class Admin {
 			'actionExportExcel'        => $this->config['ajax_action_export_excel'] ?? 'd4h_incidents_ajax_export_excel',
 			'actionExportPng'          => $this->config['ajax_action_export_png'] ?? 'd4h_incidents_ajax_export_png',
 			'actionExportReportByTags' => $this->config['ajax_action_export_report_by_tags'] ?? 'd4h_incidents_ajax_export_report_by_tags',
+			'initialTags'              => $initial_tags,
 		) );
 
 		wp_enqueue_style(
@@ -448,6 +463,46 @@ final class Admin {
 	}
 
 	/**
+	 * Collect tag id => name from incident tag objects. Used when API/Core tags are empty.
+	 *
+	 * @param array<int, array<string, mixed>> $incidents
+	 * @return array<int, string>
+	 */
+	private function collect_tags_from_incidents( array $incidents ): array {
+		$tags_map = array();
+		foreach ( $incidents as $incident ) {
+			$raw_tags = $incident['tags'] ?? $incident['activityTags'] ?? $incident['activity_tags'] ?? array();
+			if ( is_array( $raw_tags ) ) {
+				foreach ( $raw_tags as $item ) {
+					$tag_obj = is_array( $item ) ? ( $item['tag'] ?? $item ) : null;
+					if ( is_array( $tag_obj ) ) {
+						$id = isset( $tag_obj['id'] ) ? (int) $tag_obj['id'] : ( isset( $tag_obj['_id'] ) ? (int) $tag_obj['_id'] : null );
+						if ( $id !== null && $id > 0 ) {
+							$name = $tag_obj['name'] ?? $tag_obj['label'] ?? $tag_obj['title'] ?? '';
+							if ( is_string( $name ) && trim( $name ) !== '' ) {
+								$tags_map[ $id ] = trim( $name );
+							} elseif ( ! isset( $tags_map[ $id ] ) ) {
+								$tags_map[ $id ] = sprintf( __( 'Tag %d', 'd4h-incidents' ), $id );
+							}
+						}
+					} elseif ( is_numeric( $item ) && (int) $item > 0 && ! isset( $tags_map[ (int) $item ] ) ) {
+						$tags_map[ (int) $item ] = sprintf( __( 'Tag %d', 'd4h-incidents' ), (int) $item );
+					}
+				}
+			}
+			$tag_ids = $incident['tagIds'] ?? $incident['tag_ids'] ?? array();
+			if ( is_array( $tag_ids ) ) {
+				foreach ( $tag_ids as $tid ) {
+					if ( is_numeric( $tid ) && (int) $tid > 0 && ! isset( $tags_map[ (int) $tid ] ) ) {
+						$tags_map[ (int) $tid ] = sprintf( __( 'Tag %d', 'd4h-incidents' ), (int) $tid );
+					}
+				}
+			}
+		}
+		return $tags_map;
+	}
+
+	/**
 	 * Process incidents into stats and chart data.
 	 *
 	 * @param array<int, array<string, mixed>> $incidents
@@ -459,6 +514,11 @@ final class Admin {
 	 * @return array<string, mixed>
 	 */
 	private function process_incidents( array $incidents, API_Client $api, string $context, string $context_id, array $attendance = array(), array $tags_map = array() ): array {
+		$tags_from_incidents = $this->collect_tags_from_incidents( $incidents );
+		if ( ! empty( $tags_from_incidents ) ) {
+			$tags_map = array_merge( $tags_map, $tags_from_incidents );
+		}
+
 		$stats = array(
 			'total_incidents'                   => count( $incidents ),
 			'total_participants'                => 0,
@@ -1109,7 +1169,14 @@ final class Admin {
 					</span>
 					<div id="d4h-incidents-tag-checkboxes" class="d4h-tag-checkboxes">
 					<?php
-					$core_tags = function_exists( 'd4h_core_get_tags_map' ) ? d4h_core_get_tags_map() : array();
+					$core_tags = array();
+					if ( function_exists( 'd4h_core_get_tags_map' ) ) {
+						$core_tags = d4h_core_get_tags_map();
+					}
+					if ( empty( $core_tags ) ) {
+						$core_tags = get_option( 'd4h_core_tags_map', array() );
+					}
+					$core_tags = is_array( $core_tags ) ? $core_tags : array();
 					if ( ! empty( $core_tags ) ) {
 						$sorted = $core_tags;
 						asort( $sorted );

@@ -90,9 +90,12 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'Invalid API response.', 'd4h-core' ) ), 500 );
 		}
 
-		$raw_tags = $data['results'] ?? $data['data'] ?? $data['content'] ?? $data['tags'] ?? array();
+		$raw_tags = $data['results'] ?? $data['data'] ?? $data['content'] ?? $data['tags'] ?? $data['items'] ?? $data['records'] ?? array();
 		if ( ! is_array( $raw_tags ) ) {
 			$raw_tags = array();
+		}
+		if ( empty( $raw_tags ) && isset( $data[0] ) && is_array( $data[0] ) ) {
+			$raw_tags = $data;
 		}
 
 		$tags_map = $this->build_tags_map( $raw_tags );

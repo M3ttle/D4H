@@ -55,19 +55,17 @@
 	}
 
 	function renderTagFilter(processed) {
-		var container = document.getElementById('d4h-incidents-tag-filter');
 		var checkboxesWrap = document.getElementById('d4h-incidents-tag-checkboxes');
-		if (!container || !checkboxesWrap) return;
+		if (!checkboxesWrap) return;
 		var allTags = (processed && processed.all_tags) || [];
+		if (allTags.length === 0 && (cfg && cfg.initialTags && cfg.initialTags.length > 0)) {
+			allTags = cfg.initialTags;
+		}
 		var hasTags = allTags.length > 0;
-		var hasNoTagInData = (processed && processed.stats && processed.stats.incidents_list || []).some(function (item) {
+		var incidentsList = (processed && processed.stats && processed.stats.incidents_list) || [];
+		var hasNoTagInData = incidentsList.some(function (item) {
 			return !(item.tag_ids && item.tag_ids.length > 0);
 		});
-		if (!hasTags && !hasNoTagInData) {
-			container.style.display = 'none';
-			return;
-		}
-		container.style.display = 'block';
 		var html = '';
 		if (hasNoTagInData) {
 			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '" checked /> No tag</label>';
@@ -80,6 +78,9 @@
 		sortedTags.forEach(function (tag) {
 			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(String(tag.id)) + '" checked /> ' + escapeHtml(tag.name || String(tag.id)) + '</label>';
 		});
+		if (!html && incidentsList.length > 0) {
+			html = '<span class="description">No tags in fetched data.</span>';
+		}
 		checkboxesWrap.innerHTML = html;
 	}
 
@@ -420,6 +421,7 @@
 		document.getElementById('d4h-incidents-results').style.display = 'block';
 
 		currentPage = 1;
+		renderTagFilter(processed);
 		renderIncidentsTable(processed);
 
 		renderIncidentsPerTagBoxes(processed);
@@ -610,21 +612,45 @@
 		showMessage('CSV downloaded.', 'success');
 	}
 
+	function renderTagFilterFromTags(allTags) {
+		var checkboxesWrap = document.getElementById('d4h-incidents-tag-checkboxes');
+		if (!checkboxesWrap) return;
+		if (!allTags || allTags.length === 0) return;
+		var html = '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '" checked /> No tag</label>';
+		var sorted = allTags.slice().sort(function (a, b) {
+			var nameA = String(a.name || a.id || '');
+			var nameB = String(b.name || b.id || '');
+			return nameA.localeCompare(nameB);
+		});
+		sorted.forEach(function (tag) {
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(String(tag.id)) + '" checked /> ' + escapeHtml(tag.name || String(tag.id)) + '</label>';
+		});
+		checkboxesWrap.innerHTML = html;
+	}
+
 	function init() {
-		var tagFilterToggle = document.getElementById('d4h-incidents-tag-filter-toggle');
-		var tagFilterContent = document.getElementById('d4h-incidents-tag-filter-content');
-		if (tagFilterToggle && tagFilterContent) {
-			var showLabel = tagFilterToggle.querySelector('.d4h-tag-filter-show');
-			var hideLabel = tagFilterToggle.querySelector('.d4h-tag-filter-hide');
-			tagFilterToggle.addEventListener('click', function () {
-				var hidden = tagFilterContent.style.display === 'none';
-				tagFilterContent.style.display = hidden ? 'block' : 'none';
-				tagFilterContent.setAttribute('aria-hidden', hidden ? 'false' : 'true');
-				tagFilterToggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
-				if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
-				if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
-			});
+		var initialTags = (cfg && cfg.initialTags) || [];
+		if (initialTags.length > 0) {
+			renderTagFilterFromTags(initialTags);
 		}
+
+		document.addEventListener('click', function (ev) {
+			var target = ev.target;
+			if (!target) return;
+			var toggle = target.id === 'd4h-incidents-tag-filter-toggle' ? target : (target.closest ? target.closest('#d4h-incidents-tag-filter-toggle') : null);
+			if (!toggle) return;
+			toggle = document.getElementById('d4h-incidents-tag-filter-toggle');
+			var content = document.getElementById('d4h-incidents-tag-filter-content');
+			if (!toggle || !content) return;
+			var showLabel = toggle.querySelector('.d4h-tag-filter-show');
+			var hideLabel = toggle.querySelector('.d4h-tag-filter-hide');
+			var hidden = content.style.display === 'none' || content.style.display === '';
+			content.style.display = hidden ? 'block' : 'none';
+			content.setAttribute('aria-hidden', hidden ? 'false' : 'true');
+			toggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
+			if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
+			if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
+		});
 
 		var fetchBtn = document.getElementById('d4h-incidents-fetch');
 		if (fetchBtn) fetchBtn.addEventListener('click', fetchData);
