@@ -2,7 +2,7 @@
 /**
  * Plugin Name: D4H Calendar
  * Description: Fetches events and exercises from D4H Team Manager API, stores them locally, and displays them in a calendar. Sync via cron or manual update from admin.
- * Version: 1.0.4
+ * Version: 1.1.0
  * Author: Nonni
  * License: GPL v2 or later
  * Text Domain: d4h-calendar
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const D4H_CALENDAR_VERSION = '1.0.0';
+const D4H_CALENDAR_VERSION = '1.1.0';
 const D4H_CALENDAR_PLUGIN_FILE = __FILE__;
 const D4H_CALENDAR_PLUGIN_DIR = __DIR__;
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: D4H Core
  * Description: Shared D4H API credentials, logs, and admin menu. Required by D4H Calendar and D4H Incidents.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Nonni
  * License: GPL v2 or later
  * Text Domain: d4h-core
@@ -12,7 +12,7 @@
 defined( 'ABSPATH' ) || exit;
 
 define( 'D4H_CORE_ACTIVE', true );
-define( 'D4H_CORE_VERSION', '1.0.0' );
+define( 'D4H_CORE_VERSION', '1.1.0' );
 define( 'D4H_CORE_PLUGIN_FILE', __FILE__ );
 define( 'D4H_CORE_PLUGIN_DIR', __DIR__ );
 
