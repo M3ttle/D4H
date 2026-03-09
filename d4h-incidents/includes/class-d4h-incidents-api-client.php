@@ -63,7 +63,31 @@ final class API_Client {
 	 */
 	public function get_tags( string $context, string $context_id, array $args = array() ) {
 		$path = sprintf( '/v3/%s/%s/tags', $context, $context_id );
-		return $this->fetch_paginated( $path, $args );
+		$tags = $this->fetch_paginated( $path, $args );
+		if ( is_wp_error( $tags ) ) {
+			return $tags;
+		}
+		if ( ! empty( $tags ) ) {
+			return $tags;
+		}
+		$url = $this->base_url . $path . '?' . http_build_query( array_filter( array_merge( $args, array( 'page' => 0, 'size' => 500 ) ) ) );
+		$response = $this->request( $url );
+		if ( is_wp_error( $response ) || ! is_array( $response ) ) {
+			return is_wp_error( $response ) ? $response : array();
+		}
+		if ( isset( $response['results'] ) && is_array( $response['results'] ) ) {
+			return $response['results'];
+		}
+		if ( isset( $response['data'] ) && is_array( $response['data'] ) ) {
+			return $response['data'];
+		}
+		if ( isset( $response['content'] ) && is_array( $response['content'] ) ) {
+			return $response['content'];
+		}
+		if ( isset( $response['tags'] ) && is_array( $response['tags'] ) ) {
+			return $response['tags'];
+		}
+		return array();
 	}
 
 	/**

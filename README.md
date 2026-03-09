@@ -27,13 +27,14 @@ Without Core, Calendar and Incidents add their pages under **Settings**. API cre
 
 ## D4H Core
 
-Stores **shared API credentials** (token, context, context ID), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar and Incidents use this data when Core is active.
+Stores **shared API credentials** (token, context, context ID), **tags** (id → name), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar and Incidents use credentials; Incidents uses Core tags for filtering and display.
 
 ### Quick start
 
 1. Copy `d4h-core` into `wp-content/plugins/` and activate.
 2. Go to **D4H → Settings**, enter your D4H API token, context (team or organisation), and context ID.
-3. Activate Calendar and/or Incidents; they will appear under the D4H menu.
+3. Click **Update tags** to fetch and store tag names from the API (required for D4H Incidents tag filter and graphs).
+4. Activate Calendar and/or Incidents; they will appear under the D4H menu.
 
 ### Project structure
 
@@ -41,7 +42,7 @@ Stores **shared API credentials** (token, context, context ID), **API logs**, an
 |------|------|
 | `d4h-core.php` | Plugin bootstrap |
 | `includes/config.php` | Config (no secrets) |
-| `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()`, `d4h_core_get_github_token()` |
+| `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()`, `d4h_core_get_tags_map()`, `d4h_core_get_github_token()` |
 | `includes/class-d4h-core-admin.php` | D4H menu, Settings page (credentials, GitHub token, sync history, API logs) |
 | `includes/class-d4h-core-logger.php` | API logs and sync history |
 | `uninstall.php` | Cleans up on uninstall |
@@ -103,7 +104,7 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 ### Features
 
 - **Time range selector**: 7 days, 30 days, 90 days, 1 year presets or custom date range.
-- **Statistics**: Total incidents, total participants (sum of countAttendance), total duration, plus **incidents per tag** (a box for each tag showing incident count).
+- **Statistics**: Total incidents, total participants (sum of countAttendance), total duration, plus **incidents per tag** (a box for each tag showing incident count). Tags are loaded via **D4H Core → Settings → Update tags**.
 - **Incidents table**: Name, description (HTML stripped), tags, date, duration, participants (countAttendance). Sortable columns (including Tags). Pagination with per-page selector (10/25/50/100/200). Filter by tags (reuses same tag list as D4H Calendar); includes "No tag" for incidents without tags. **Unchecking tags does not change the current data**; select tags and press **Fetch data** again to filter.
 - **Charts**:  
   - Incidents and participants by period: two side-by-side charts (incidents on the left, participants on the right) with period selector (weekly/monthly/yearly).  

@@ -21,6 +21,108 @@ final class Admin {
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ), 5 );
 		add_action( 'admin_init', array( $this, 'handle_save' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_settings_scripts' ) );
+		add_action( 'wp_ajax_d4h_core_update_tags', array( $this, 'ajax_update_tags' ) );
+	}
+
+	public function enqueue_settings_scripts( string $hook ): void {
+		$slug = $this->config['admin_menu_slug'] ?? 'd4h-core';
+		$expected = 'toplevel_page_' . $slug;
+		if ( $hook !== $expected ) {
+			return;
+		}
+		wp_localize_script( 'jquery', 'd4hCoreSettings', array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'd4h_core_update_tags' ),
+			'i18n'    => array(
+				'updating' => __( 'Updating...', 'd4h-core' ),
+				'success'  => __( 'Tags updated successfully.', 'd4h-core' ),
+				'error'    => __( 'Failed to update tags.', 'd4h-core' ),
+			),
+		) );
+	}
+
+	public function ajax_update_tags(): void {
+		check_ajax_referer( 'd4h_core_update_tags', 'nonce' );
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-core' ) ), 403 );
+		}
+
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : '';
+		if ( $token === '' ) {
+			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-core' ) ), 400 );
+		}
+
+		$context    = function_exists( 'd4h_core_get_context' ) ? d4h_core_get_context() : '';
+		$context_id = function_exists( 'd4h_core_get_context_id' ) ? d4h_core_get_context_id() : '';
+		if ( $context === '' || $context_id === '' ) {
+			wp_send_json_error( array( 'message' => __( 'Context and Context ID must be set.', 'd4h-core' ) ), 400 );
+		}
+
+		$context    = in_array( strtolower( $context ), array( 'team', 'organisation' ), true ) ? strtolower( $context ) : 'team';
+		$base_url   = rtrim( (string) ( $this->config['api_base_url'] ?? 'https://api.team-manager.us.d4h.com' ), '/' );
+		$path       = sprintf( '/v3/%s/%s/tags', $context, $context_id );
+		$url        = $base_url . $path . '?page=0&size=500';
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $token,
+					'Accept'        => 'application/json',
+				),
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( array( 'message' => $response->get_error_message() ), 500 );
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			wp_send_json_error( array( 'message' => sprintf( __( 'API returned %d', 'd4h-core' ), $code ) ), $code );
+		}
+
+		$data = json_decode( $body, true );
+		if ( ! is_array( $data ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid API response.', 'd4h-core' ) ), 500 );
+		}
+
+		$raw_tags = $data['results'] ?? $data['data'] ?? $data['content'] ?? $data['tags'] ?? array();
+		if ( ! is_array( $raw_tags ) ) {
+			$raw_tags = array();
+		}
+
+		$tags_map = $this->build_tags_map( $raw_tags );
+		$opt      = $this->config['option_tags_map'] ?? 'd4h_core_tags_map';
+		update_option( $opt, $tags_map, false );
+
+		wp_send_json_success( array( 'count' => count( $tags_map ) ) );
+	}
+
+	/**
+	 * Build id => name map from tag objects.
+	 *
+	 * @param array<int, array<string, mixed>> $tags
+	 * @return array<int, string>
+	 */
+	private function build_tags_map( array $tags ): array {
+		$tags_map = array();
+		foreach ( $tags as $tag ) {
+			if ( ! is_array( $tag ) ) {
+				continue;
+			}
+			$id = isset( $tag['id'] ) ? (int) $tag['id'] : ( isset( $tag['_id'] ) ? (int) $tag['_id'] : null );
+			if ( $id === null || $id === 0 ) {
+				continue;
+			}
+			$name = $tag['name'] ?? $tag['label'] ?? $tag['title'] ?? '';
+			$name = is_string( $name ) ? trim( $name ) : '';
+			$tags_map[ $id ] = $name !== '' ? $name : sprintf( __( 'Tag %d', 'd4h-core' ), $id );
+		}
+		return $tags_map;
 	}
 
 	public function add_menu(): void {
@@ -175,6 +277,56 @@ final class Admin {
 						if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
 					});
 				}
+			})();
+			</script>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Tags', 'd4h-core' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Retrieve tag names from the D4H API. Used by D4H Incidents for filtering and display.', 'd4h-core' ); ?></p>
+			<p>
+				<button type="button" id="d4h-core-update-tags" class="button button-secondary">
+					<?php esc_html_e( 'Update tags', 'd4h-core' ); ?>
+				</button>
+				<span id="d4h-core-tags-status" style="margin-left: 0.5em;"></span>
+			</p>
+			<?php
+			$tags_map = function_exists( 'd4h_core_get_tags_map' ) ? d4h_core_get_tags_map() : array();
+			if ( ! empty( $tags_map ) ) :
+				?>
+				<p class="description"><?php echo esc_html( sprintf( __( 'Stored %d tags.', 'd4h-core' ), count( $tags_map ) ) ); ?></p>
+			<?php endif; ?>
+			<script>
+			(function() {
+				var btn = document.getElementById('d4h-core-update-tags');
+				var status = document.getElementById('d4h-core-tags-status');
+				if (!btn || !status) return;
+				var cfg = window.d4hCoreSettings || {};
+				btn.addEventListener('click', function() {
+					btn.disabled = true;
+					status.textContent = cfg.i18n && cfg.i18n.updating ? cfg.i18n.updating : 'Updating...';
+					status.style.color = '';
+					var fd = new FormData();
+					fd.append('action', 'd4h_core_update_tags');
+					fd.append('nonce', cfg.nonce || '');
+					fetch(cfg.ajaxUrl || '', { method: 'POST', body: fd, credentials: 'same-origin' })
+						.then(function(r) { return r.json(); })
+						.then(function(res) {
+							if (res.success) {
+								status.textContent = (cfg.i18n && cfg.i18n.success ? cfg.i18n.success : 'Tags updated.') + (res.data && res.data.count != null ? ' (' + res.data.count + ')' : '');
+								status.style.color = '#00a32a';
+								location.reload();
+							} else {
+								status.textContent = (cfg.i18n && cfg.i18n.error ? cfg.i18n.error : 'Failed.') + (res.data && res.data.message ? ' ' + res.data.message : '');
+								status.style.color = '#d63638';
+							}
+						})
+						.catch(function() {
+							status.textContent = cfg.i18n && cfg.i18n.error ? cfg.i18n.error : 'Failed.';
+							status.style.color = '#d63638';
+						})
+						.finally(function() { btn.disabled = false; });
+				});
 			})();
 			</script>
 

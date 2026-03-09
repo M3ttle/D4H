@@ -420,7 +420,6 @@
 		document.getElementById('d4h-incidents-results').style.display = 'block';
 
 		currentPage = 1;
-		renderTagFilter(processed);
 		renderIncidentsTable(processed);
 
 		renderIncidentsPerTagBoxes(processed);
@@ -612,6 +611,21 @@
 	}
 
 	function init() {
+		var tagFilterToggle = document.getElementById('d4h-incidents-tag-filter-toggle');
+		var tagFilterContent = document.getElementById('d4h-incidents-tag-filter-content');
+		if (tagFilterToggle && tagFilterContent) {
+			var showLabel = tagFilterToggle.querySelector('.d4h-tag-filter-show');
+			var hideLabel = tagFilterToggle.querySelector('.d4h-tag-filter-hide');
+			tagFilterToggle.addEventListener('click', function () {
+				var hidden = tagFilterContent.style.display === 'none';
+				tagFilterContent.style.display = hidden ? 'block' : 'none';
+				tagFilterContent.setAttribute('aria-hidden', hidden ? 'false' : 'true');
+				tagFilterToggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
+				if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
+				if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
+			});
+		}
+
 		var fetchBtn = document.getElementById('d4h-incidents-fetch');
 		if (fetchBtn) fetchBtn.addEventListener('click', fetchData);
 

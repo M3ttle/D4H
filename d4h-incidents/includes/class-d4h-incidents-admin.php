@@ -309,17 +309,28 @@ final class Admin {
 	 */
 	private function filter_incidents_by_tags( array $incidents, array $selected_tag_ids, string $no_tag_value = '__no_tag__' ): array {
 		return array_values( array_filter( $incidents, function ( $incident ) use ( $selected_tag_ids, $no_tag_value ) {
-			$raw_tags = $incident['tags'] ?? $incident['activityTags'] ?? array();
 			$tag_ids  = array();
+			$raw_tags = $incident['tags'] ?? $incident['activityTags'] ?? $incident['activity_tags'] ?? array();
 			if ( is_array( $raw_tags ) ) {
 				foreach ( $raw_tags as $item ) {
 					$tag_obj = is_array( $item ) ? ( $item['tag'] ?? $item ) : null;
 					if ( is_array( $tag_obj ) && isset( $tag_obj['id'] ) ) {
 						$tag_ids[] = (string) (int) $tag_obj['id'];
+					} elseif ( is_numeric( $item ) && (int) $item > 0 ) {
+						$tag_ids[] = (string) (int) $item;
 					}
 				}
 			}
-			$has_tags = ! empty( $tag_ids );
+			$tag_ids_only = $incident['tagIds'] ?? $incident['tag_ids'] ?? array();
+			if ( is_array( $tag_ids_only ) ) {
+				foreach ( $tag_ids_only as $tid ) {
+					if ( is_numeric( $tid ) && (int) $tid > 0 ) {
+						$tag_ids[] = (string) (int) $tid;
+					}
+				}
+			}
+			$tag_ids   = array_unique( $tag_ids );
+			$has_tags  = ! empty( $tag_ids );
 			if ( $has_tags ) {
 				foreach ( $tag_ids as $tid ) {
 					if ( in_array( $tid, $selected_tag_ids, true ) ) {
@@ -396,6 +407,12 @@ final class Admin {
 	 * @return array<int, string>
 	 */
 	private function get_tags_map( API_Client $api, string $context, string $context_id ): array {
+		if ( function_exists( 'd4h_core_get_tags_map' ) ) {
+			$core_tags = d4h_core_get_tags_map();
+			if ( is_array( $core_tags ) && ! empty( $core_tags ) ) {
+				return $core_tags;
+			}
+		}
 		$tags_map = get_option( 'd4h_calendar_tags_map', array() );
 		if ( is_array( $tags_map ) && ! empty( $tags_map ) ) {
 			return $tags_map;
@@ -416,14 +433,16 @@ final class Admin {
 	private function build_tags_map( array $tags ): array {
 		$tags_map = array();
 		foreach ( $tags as $tag ) {
-			$id = isset( $tag['id'] ) ? (int) $tag['id'] : null;
-			if ( $id === null ) {
+			if ( ! is_array( $tag ) ) {
+				continue;
+			}
+			$id = isset( $tag['id'] ) ? (int) $tag['id'] : ( isset( $tag['_id'] ) ? (int) $tag['_id'] : null );
+			if ( $id === null || $id === 0 ) {
 				continue;
 			}
 			$name = $tag['name'] ?? $tag['label'] ?? $tag['title'] ?? '';
-			if ( is_string( $name ) && trim( $name ) !== '' ) {
-				$tags_map[ $id ] = trim( $name );
-			}
+			$name = is_string( $name ) ? trim( $name ) : '';
+			$tags_map[ $id ] = $name !== '' ? $name : sprintf( __( 'Tag %d', 'd4h-incidents' ), $id );
 		}
 		return $tags_map;
 	}
@@ -833,18 +852,33 @@ final class Admin {
 
 		$tag_ids   = array();
 		$tag_names = array();
-		$raw_tags  = $incident['tags'] ?? $incident['activityTags'] ?? array();
+		$raw_tags  = $incident['tags'] ?? $incident['activityTags'] ?? $incident['activity_tags'] ?? array();
 		if ( is_array( $raw_tags ) ) {
 			foreach ( $raw_tags as $item ) {
 				$tag_obj = is_array( $item ) ? ( $item['tag'] ?? $item ) : null;
 				if ( ! is_array( $tag_obj ) ) {
+					$id = is_numeric( $item ) ? (int) $item : null;
+					if ( $id !== null && $id > 0 ) {
+						$tag_ids[] = $id;
+						$tag_names[] = $tags_map[ $id ] ?? (string) $id;
+					}
 					continue;
 				}
-				$id = isset( $tag_obj['id'] ) ? (int) $tag_obj['id'] : null;
-				if ( $id !== null ) {
+				$id = isset( $tag_obj['id'] ) ? (int) $tag_obj['id'] : ( isset( $tag_obj['_id'] ) ? (int) $tag_obj['_id'] : null );
+				if ( $id !== null && $id > 0 ) {
 					$tag_ids[] = $id;
 					$name     = $tags_map[ $id ] ?? $tag_obj['name'] ?? $tag_obj['label'] ?? $tag_obj['title'] ?? (string) $id;
 					$tag_names[] = is_string( $name ) ? trim( $name ) : (string) $id;
+				}
+			}
+		}
+		$tag_ids_only = $incident['tagIds'] ?? $incident['tag_ids'] ?? array();
+		if ( is_array( $tag_ids_only ) && ! empty( $tag_ids_only ) ) {
+			foreach ( $tag_ids_only as $tid ) {
+				$id = is_numeric( $tid ) ? (int) $tid : 0;
+				if ( $id > 0 && ! in_array( $id, $tag_ids, true ) ) {
+					$tag_ids[] = $id;
+					$tag_names[] = $tags_map[ $id ] ?? (string) $id;
 				}
 			}
 		}
@@ -1061,16 +1095,43 @@ final class Admin {
 				<div id="d4h-incidents-loading" style="display:none;"><?php esc_html_e( 'Fetching...', 'd4h-incidents' ); ?></div>
 			</div>
 
-			<div id="d4h-incidents-results" class="d4h-incidents-results" style="display:none;">
-				<div id="d4h-incidents-tag-filter" class="d4h-incidents-tag-filter" style="display:none;">
+			<div id="d4h-incidents-tag-filter" class="d4h-incidents-tag-filter">
+				<button type="button" id="d4h-incidents-tag-filter-toggle" class="button-link" aria-expanded="false" aria-controls="d4h-incidents-tag-filter-content">
+					<span class="d4h-tag-filter-show"><?php esc_html_e( 'Show filter', 'd4h-incidents' ); ?></span>
+					<span class="d4h-tag-filter-hide" style="display:none;"><?php esc_html_e( 'Hide filter', 'd4h-incidents' ); ?></span>
+				</button>
+				<div id="d4h-incidents-tag-filter-content" style="display:none;" aria-hidden="true">
 					<span class="d4h-tag-filter-label"><?php esc_html_e( 'Filter by tags:', 'd4h-incidents' ); ?></span>
 					<span class="d4h-tag-filter-hint"><?php esc_html_e( 'Select tags and press Fetch data to filter. Unchecking tags does not change the current data.', 'd4h-incidents' ); ?></span>
 					<span class="d4h-tag-filter-actions">
 						<button type="button" class="button button-small d4h-tag-select-all"><?php esc_html_e( 'All', 'd4h-incidents' ); ?></button>
 						<button type="button" class="button button-small d4h-tag-select-none"><?php esc_html_e( 'None', 'd4h-incidents' ); ?></button>
 					</span>
-					<div id="d4h-incidents-tag-checkboxes" class="d4h-tag-checkboxes"></div>
+					<div id="d4h-incidents-tag-checkboxes" class="d4h-tag-checkboxes">
+					<?php
+					$core_tags = function_exists( 'd4h_core_get_tags_map' ) ? d4h_core_get_tags_map() : array();
+					if ( ! empty( $core_tags ) ) {
+						$sorted = $core_tags;
+						asort( $sorted );
+						?>
+						<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="__no_tag__" checked /> <?php esc_html_e( 'No tag', 'd4h-incidents' ); ?></label>
+						<?php
+						foreach ( $sorted as $tag_id => $tag_name ) {
+							?>
+							<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="<?php echo esc_attr( (string) $tag_id ); ?>" checked /> <?php echo esc_html( $tag_name ); ?></label>
+							<?php
+						}
+					} else {
+						?>
+						<span class="description"><?php esc_html_e( 'No tags yet. Run Update tags in D4H → Settings first.', 'd4h-incidents' ); ?></span>
+						<?php
+					}
+					?>
+					</div>
 				</div>
+			</div>
+
+			<div id="d4h-incidents-results" class="d4h-incidents-results" style="display:none;">
 				<h2><?php esc_html_e( 'Statistics', 'd4h-incidents' ); ?></h2>
 				<div class="d4h-incidents-stats-cards">
 					<div class="d4h-stat-card">

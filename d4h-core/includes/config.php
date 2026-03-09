@@ -17,10 +17,11 @@ function d4h_core_get_config() {
 		'api_base_url' => 'https://api.team-manager.us.d4h.com',
 		'whoami_path'  => '/v3/whoami',
 
-		'option_token'      => 'd4h_core_api_token',
-		'option_context'    => 'd4h_core_api_context',
-		'option_context_id' => 'd4h_core_api_context_id',
-		'option_api_logs'   => 'd4h_core_api_logs',
+		'option_token'       => 'd4h_core_api_token',
+		'option_context'     => 'd4h_core_api_context',
+		'option_context_id'  => 'd4h_core_api_context_id',
+		'option_tags_map'    => 'd4h_core_tags_map',
+		'option_api_logs'    => 'd4h_core_api_logs',
 		'option_sync_history' => 'd4h_core_sync_history',
 		'option_github_token' => 'd4h_core_github_token',
 

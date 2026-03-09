@@ -48,6 +48,18 @@ function d4h_core_get_github_token(): string {
 }
 
 /**
+ * Get D4H tags map (id => name). Used by D4H Incidents.
+ * Call "Update tags" in D4H Settings to fetch and store tags from the API.
+ *
+ * @return array<int, string> Tag ID => tag name
+ */
+function d4h_core_get_tags_map(): array {
+	$config = d4h_core_get_config();
+	$map    = get_option( $config['option_tags_map'] ?? 'd4h_core_tags_map', array() );
+	return is_array( $map ) ? $map : array();
+}
+
+/**
  * Get D4H API context ID (team or organisation ID).
  *
  * @return string

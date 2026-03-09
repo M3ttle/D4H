@@ -15,7 +15,7 @@ if ( ! file_exists( $config_file ) ) {
 require_once $config_file;
 $config = d4h_core_get_config();
 
-$option_keys = array( 'option_token', 'option_context', 'option_context_id', 'option_api_logs', 'option_sync_history' );
+$option_keys = array( 'option_token', 'option_context', 'option_context_id', 'option_tags_map', 'option_api_logs', 'option_sync_history' );
 foreach ( $option_keys as $key ) {
 	if ( isset( $config[ $key ] ) ) {
 		delete_option( $config[ $key ] );
