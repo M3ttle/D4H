@@ -68,6 +68,44 @@ final class API_Client {
 	}
 
 	/**
+	 * Get team attendance for incidents in a date range.
+	 * Uses /v3/{context}/{context_id}/attendance with activity_resource_type=Incident.
+	 *
+	 * @param string $context    'team' or 'organisation'
+	 * @param string $context_id Context ID (e.g. 434)
+	 * @param string $ends_after ISO8601 datetime (e.g. 2026-02-21T00:01:00.000Z)
+	 * @param string $ends_before ISO8601 datetime (e.g. 2026-03-09T00:01:00.000Z)
+	 * @return array<int, array<string, mixed>>|\WP_Error
+	 */
+	public function get_team_attendance( string $context, string $context_id, string $ends_after, string $ends_before ) {
+		$path  = sprintf( '/v3/%s/%s/attendance', $context, $context_id );
+		$query = array(
+			'order'                  => 'desc',
+			'status'                 => 'ATTENDING',
+			'activity_resource_type' => 'Incident',
+			'ends_after'             => $ends_after,
+			'ends_before'            => $ends_before,
+			'size'                   => 250,
+		);
+		return $this->fetch_paginated( $path, $query );
+	}
+
+	/**
+	 * Get a single member by ID.
+	 * GET /v3/{context}/{context_id}/members/{member_id}
+	 *
+	 * @param string $context    'team' or 'organisation'
+	 * @param string $context_id Context ID (e.g. 434)
+	 * @param int    $member_id  Member ID
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function get_member( string $context, string $context_id, int $member_id ) {
+		$path  = sprintf( '/v3/%s/%s/members/%d', $context, $context_id, $member_id );
+		$url   = $this->base_url . $path;
+		return $this->request( $url );
+	}
+
+	/**
 	 * Get activity attendance for an incident (participants).
 	 * Uses the path from config 'attendance_path' if set, otherwise the default.
 	 * Set config 'attendance_path' to override the path if D4H uses a different endpoint.

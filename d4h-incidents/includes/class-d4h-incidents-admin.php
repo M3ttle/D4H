@@ -25,11 +25,13 @@ final class Admin {
 		add_action( 'admin_menu', array( $this, 'add_menu_page' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
-		$action_fetch = $this->config['ajax_action_fetch'] ?? 'd4h_incidents_ajax_fetch';
-		$action_excel = $this->config['ajax_action_export_excel'] ?? 'd4h_incidents_ajax_export_excel';
-		$action_png   = $this->config['ajax_action_export_png'] ?? 'd4h_incidents_ajax_export_png';
+		$action_fetch     = $this->config['ajax_action_fetch'] ?? 'd4h_incidents_ajax_fetch';
+		$action_members   = $this->config['ajax_action_member_names'] ?? 'd4h_incidents_ajax_fetch_member_names';
+		$action_excel     = $this->config['ajax_action_export_excel'] ?? 'd4h_incidents_ajax_export_excel';
+		$action_png       = $this->config['ajax_action_export_png'] ?? 'd4h_incidents_ajax_export_png';
 
 		add_action( 'wp_ajax_' . $action_fetch, array( $this, 'ajax_fetch' ) );
+		add_action( 'wp_ajax_' . $action_members, array( $this, 'ajax_fetch_member_names' ) );
 		add_action( 'wp_ajax_' . $action_excel, array( $this, 'ajax_export_excel' ) );
 		add_action( 'wp_ajax_' . $action_png, array( $this, 'ajax_export_png' ) );
 	}
@@ -106,9 +108,10 @@ final class Admin {
 		);
 
 		wp_localize_script( 'd4h-incidents-admin', 'd4hIncidentsAdmin', array(
-			'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-			'nonce'          => wp_create_nonce( 'd4h_incidents_admin' ),
-			'actionFetch'    => $this->config['ajax_action_fetch'] ?? 'd4h_incidents_ajax_fetch',
+			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
+			'nonce'             => wp_create_nonce( 'd4h_incidents_admin' ),
+			'actionFetch'       => $this->config['ajax_action_fetch'] ?? 'd4h_incidents_ajax_fetch',
+			'actionMemberNames' => $this->config['ajax_action_member_names'] ?? 'd4h_incidents_ajax_fetch_member_names',
 			'actionExportExcel' => $this->config['ajax_action_export_excel'] ?? 'd4h_incidents_ajax_export_excel',
 			'actionExportPng'   => $this->config['ajax_action_export_png'] ?? 'd4h_incidents_ajax_export_png',
 		) );
@@ -182,23 +185,151 @@ final class Admin {
 			wp_send_json_error( array( 'message' => $incidents->get_error_message() ), 500 );
 		}
 
-		$processed = $this->process_incidents( $incidents, $api, $context, $context_id );
+		$ends_after  = gmdate( 'Y-m-d\T00:01:00.000\Z', $from_ts );
+		$ends_before = gmdate( 'Y-m-d\T00:01:00.000\Z', strtotime( $to . ' +1 day' ) );
+		$attendance  = $api->get_team_attendance( $context, $context_id, $ends_after, $ends_before );
+		if ( is_wp_error( $attendance ) ) {
+			$attendance = array();
+		}
+
+		$processed = $this->process_incidents( $incidents, $api, $context, $context_id, $attendance );
 
 		$transient_key = 'd4h_incidents_data_' . md5( $from . $to );
 		set_transient( $transient_key, array(
-			'from'      => $from,
-			'to'        => $to,
-			'incidents' => $incidents,
-			'processed' => $processed,
+			'from'        => $from,
+			'to'          => $to,
+			'incidents'   => $incidents,
+			'processed'   => $processed,
+			'context'     => $context,
+			'context_id'  => $context_id,
 		), $this->config['transient_ttl'] ?? HOUR_IN_SECONDS );
 
 		update_option( $this->config['option_last_fetch'] ?? 'd4h_incidents_last_fetch', array(
 			'transient_key' => $transient_key,
 			'from'          => $from,
 			'to'            => $to,
+			'context'       => $context,
+			'context_id'    => $context_id,
 		), false );
 
 		wp_send_json_success( $processed );
+	}
+
+	/**
+	 * AJAX handler: Fetch first names for member IDs.
+	 * Uses last fetch context. Returns map of member_id => first_name.
+	 */
+	public function ajax_fetch_member_names(): void {
+		check_ajax_referer( 'd4h_incidents_admin', 'nonce' );
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-incidents' ) ), 403 );
+		}
+
+		$token = $this->get_token();
+		if ( $token === '' ) {
+			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-incidents' ) ), 400 );
+		}
+
+		$last = get_option( $this->config['option_last_fetch'] ?? 'd4h_incidents_last_fetch', array() );
+		if ( ! is_array( $last ) || empty( $last['transient_key'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Fetch incidents first.', 'd4h-incidents' ) ), 400 );
+		}
+
+		$cached = get_transient( $last['transient_key'] );
+		if ( ! is_array( $cached ) || empty( $cached['context'] ) || empty( $cached['context_id'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Cached data expired. Fetch incidents again.', 'd4h-incidents' ) ), 400 );
+		}
+
+		$member_ids_raw = isset( $_POST['member_ids'] ) && is_array( $_POST['member_ids'] )
+			? wp_unslash( $_POST['member_ids'] )
+			: array();
+		$member_ids = array();
+		foreach ( $member_ids_raw as $id ) {
+			$id = absint( $id );
+			if ( $id > 0 ) {
+				$member_ids[] = $id;
+			}
+		}
+		$member_ids = array_values( array_unique( $member_ids ) );
+
+		if ( empty( $member_ids ) ) {
+			wp_send_json_success( array( 'names' => array() ) );
+			return;
+		}
+
+		$api        = new API_Client( $this->config, $token );
+		$context    = $cached['context'];
+		$context_id = $cached['context_id'];
+		$names      = array();
+
+		foreach ( $member_ids as $member_id ) {
+			$member = $api->get_member( $context, $context_id, $member_id );
+			if ( is_wp_error( $member ) ) {
+				$names[ (string) $member_id ] = (string) $member_id;
+				continue;
+			}
+			$full_name = isset( $member['name'] ) ? trim( (string) $member['name'] ) : '';
+			$parts     = $full_name !== '' ? preg_split( '/\s+/', $full_name, 2 ) : array();
+			$first     = isset( $parts[0] ) ? trim( $parts[0] ) : '';
+			$names[ (string) $member_id ] = $first !== '' ? $first : (string) $member_id;
+		}
+
+		wp_send_json_success( array( 'names' => $names ) );
+	}
+
+	/**
+	 * Compute unique participants per period from incident-to-members mapping.
+	 *
+	 * @param array<int, int> $incident_id_to_date Incident ID => Unix timestamp
+	 * @param array<int, array<int, bool>> $incident_to_members Incident ID => [ Member ID => true ]
+	 * @return array{weekly: array{labels: array, incidents: array, participants: array}, monthly: array{labels: array, incidents: array, participants: array}, yearly: array{labels: array, incidents: array, participants: array}}
+	 */
+	private function compute_unique_participants_over_time( array $incident_id_to_date, array $incident_to_members ): array {
+		$periods = array(
+			'weekly'  => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array(), 'incident_ids' => array() ),
+			'monthly' => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array(), 'incident_ids' => array() ),
+			'yearly'  => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array(), 'incident_ids' => array() ),
+		);
+
+		foreach ( $incident_id_to_date as $incident_id => $timestamp ) {
+			$week_key   = gmdate( 'Y-\WW', $timestamp );
+			$week_label = gmdate( 'Y-m-d', strtotime( 'monday this week', $timestamp ) );
+			$month_key  = gmdate( 'Y-m', $timestamp );
+			$month_label = $month_key;
+			$year_key   = gmdate( 'Y', $timestamp );
+			$year_label = $year_key;
+
+			foreach ( array( 'weekly' => array( $week_key, $week_label ), 'monthly' => array( $month_key, $month_label ), 'yearly' => array( $year_key, $year_label ) ) as $period => $key_label ) {
+				list( $key, $label ) = $key_label;
+				if ( ! isset( $periods[ $period ]['keys'][ $key ] ) ) {
+					$periods[ $period ]['keys'][ $key ]       = count( $periods[ $period ]['labels'] );
+					$periods[ $period ]['labels'][]          = $label;
+					$periods[ $period ]['incidents'][]       = 0;
+					$periods[ $period ]['participants'][]    = 0;
+					$periods[ $period ]['incident_ids'][ $key ] = array();
+				}
+				$idx = $periods[ $period ]['keys'][ $key ];
+				$periods[ $period ]['incidents'][ $idx ]++;
+				$periods[ $period ]['incident_ids'][ $key ][] = $incident_id;
+			}
+		}
+
+		foreach ( array_keys( $periods ) as $period ) {
+			foreach ( $periods[ $period ]['incident_ids'] ?? array() as $key => $incident_ids ) {
+				$idx = $periods[ $period ]['keys'][ $key ] ?? 0;
+				$unique_members = array();
+				foreach ( $incident_ids as $incident_id ) {
+					$members = $incident_to_members[ $incident_id ] ?? array();
+					foreach ( array_keys( $members ) as $member_id ) {
+						$unique_members[ $member_id ] = true;
+					}
+				}
+				$periods[ $period ]['participants'][ $idx ] = count( $unique_members );
+			}
+			unset( $periods[ $period ]['keys'], $periods[ $period ]['incident_ids'] );
+		}
+
+		return $periods;
 	}
 
 	/**
@@ -208,9 +339,10 @@ final class Admin {
 	 * @param API_Client                       $api
 	 * @param string                           $context
 	 * @param string                           $context_id
+	 * @param array<int, array<string, mixed>> $attendance Optional attendance records for unique participants.
 	 * @return array<string, mixed>
 	 */
-	private function process_incidents( array $incidents, API_Client $api, string $context, string $context_id ): array {
+	private function process_incidents( array $incidents, API_Client $api, string $context, string $context_id, array $attendance = array() ): array {
 		$stats = array(
 			'total_incidents'                   => count( $incidents ),
 			'total_participants'                => 0,
@@ -289,25 +421,114 @@ final class Admin {
 			'data'   => $month_hour_map,
 		);
 
-		$chart_types    = array();
-		$chart_labels   = array();
-		foreach ( $stats['types'] as $label => $count ) {
-			$chart_labels[] = $label;
-			$chart_types[]  = $count;
+		$participants_over_time = $this->compute_participants_over_time( $incidents );
+		$stats['participants_over_time'] = $participants_over_time;
+
+		$incident_id_to_date = array();
+		foreach ( $incidents as $incident ) {
+			$id = isset( $incident['id'] ) ? (int) $incident['id'] : null;
+			if ( $id === null ) {
+				continue;
+			}
+			$starts_at = $incident['startsAt'] ?? $incident['starts_at'] ?? '';
+			$ts        = is_numeric( $starts_at ) ? (int) $starts_at : strtotime( $starts_at );
+			if ( $ts ) {
+				$incident_id_to_date[ $id ] = $ts;
+			}
 		}
 
-		$chart_participants_labels = array_slice( array_keys( $participant_totals ), 0, 30 );
-		$chart_participants_data   = array_slice( array_values( $participant_totals ), 0, 30 );
+		$incident_to_members = array();
+		$member_to_incidents = array();
+		foreach ( $attendance as $record ) {
+			$activity     = $record['activity'] ?? array();
+			$member       = $record['member'] ?? array();
+			$incident_id  = is_array( $activity ) ? (int) ( $activity['id'] ?? 0 ) : 0;
+			$member_id    = is_array( $member ) ? (int) ( $member['id'] ?? 0 ) : 0;
+			if ( $incident_id > 0 && $member_id > 0 ) {
+				if ( ! isset( $incident_to_members[ $incident_id ] ) ) {
+					$incident_to_members[ $incident_id ] = array();
+				}
+				$incident_to_members[ $incident_id ][ $member_id ] = true;
+				if ( ! isset( $member_to_incidents[ $member_id ] ) ) {
+					$member_to_incidents[ $member_id ] = array();
+				}
+				$member_to_incidents[ $member_id ][ $incident_id ] = true;
+			}
+		}
+
+		$unique_over_time = $this->compute_unique_participants_over_time( $incident_id_to_date, $incident_to_members );
+		foreach ( array_keys( $participants_over_time ) as $period ) {
+			if ( isset( $unique_over_time[ $period ]['participants'] ) ) {
+				$participants_over_time[ $period ]['unique_participants'] = $unique_over_time[ $period ]['participants'];
+			}
+		}
+
+		$member_incident_count = array();
+		foreach ( $member_to_incidents as $member_id => $incidents_attended ) {
+			$member_incident_count[ $member_id ] = count( $incidents_attended );
+		}
+		arsort( $member_incident_count );
+		$stats['total_unique_participants'] = count( $member_incident_count );
+		$incidents_per_member_labels = array_keys( $member_incident_count );
+		$incidents_per_member_data   = array_values( $member_incident_count );
 
 		return array(
-			'stats'                  => $stats,
-			'chart_types_labels'     => $chart_labels,
-			'chart_types_data'       => $chart_types,
-			'chart_participants_labels' => $chart_participants_labels,
-			'chart_participants_data'   => $chart_participants_data,
-			'chart_month_hour'       => $stats['month_hour'],
-			'raw_incidents'          => $incidents,
+			'stats'                        => $stats,
+			'chart_month_hour'             => $stats['month_hour'],
+			'participants_over_time'       => $participants_over_time,
+			'incidents_per_member_labels'  => $incidents_per_member_labels,
+			'incidents_per_member_data'    => $incidents_per_member_data,
+			'raw_incidents'                => $incidents,
 		);
+	}
+
+	/**
+	 * Compute incidents and participants aggregated by weekly, monthly, yearly periods.
+	 *
+	 * @param array<int, array<string, mixed>> $incidents
+	 * @return array{weekly: array{labels: array<int, string>, incidents: array<int, int>, participants: array<int, int>}, monthly: array{labels: array<int, string>, incidents: array<int, int>, participants: array<int, int>}, yearly: array{labels: array<int, string>, incidents: array<int, int>, participants: array<int, int>}}
+	 */
+	private function compute_participants_over_time( array $incidents ): array {
+		$periods = array(
+			'weekly'  => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array() ),
+			'monthly' => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array() ),
+			'yearly'  => array( 'labels' => array(), 'incidents' => array(), 'participants' => array(), 'keys' => array() ),
+		);
+
+		foreach ( $incidents as $incident ) {
+			$starts_at       = $incident['startsAt'] ?? $incident['starts_at'] ?? '';
+			$timestamp       = is_numeric( $starts_at ) ? (int) $starts_at : strtotime( $starts_at );
+			$participant_cnt = (int) ( $incident['countAttendance'] ?? $incident['count_attendance'] ?? 0 );
+			if ( ! $timestamp ) {
+				continue;
+			}
+
+			$week_key   = gmdate( 'Y-\WW', $timestamp );
+			$week_label = gmdate( 'Y-m-d', strtotime( 'monday this week', $timestamp ) );
+			$month_key  = gmdate( 'Y-m', $timestamp );
+			$month_label = gmdate( 'Y-m', $timestamp );
+			$year_key   = gmdate( 'Y', $timestamp );
+			$year_label = $year_key;
+
+			foreach ( array( 'weekly' => array( $week_key, $week_label ), 'monthly' => array( $month_key, $month_label ), 'yearly' => array( $year_key, $year_label ) ) as $period => $key_label ) {
+				list( $key, $label ) = $key_label;
+				if ( ! isset( $periods[ $period ]['keys'][ $key ] ) ) {
+					$periods[ $period ]['keys'][ $key ]     = count( $periods[ $period ]['labels'] );
+					$periods[ $period ]['labels'][]        = $label;
+					$periods[ $period ]['incidents'][]     = 0;
+					$periods[ $period ]['participants'][]  = 0;
+				}
+				$idx = $periods[ $period ]['keys'][ $key ];
+				$periods[ $period ]['incidents'][ $idx ]++;
+				$periods[ $period ]['participants'][ $idx ] += $participant_cnt;
+			}
+		}
+
+		foreach ( array_keys( $periods ) as $period ) {
+			unset( $periods[ $period ]['keys'] );
+		}
+
+		return $periods;
 	}
 
 	/**
@@ -517,6 +738,10 @@ final class Admin {
 						<span class="d4h-stat-label"><?php esc_html_e( 'Total participants', 'd4h-incidents' ); ?></span>
 					</div>
 					<div class="d4h-stat-card">
+						<span class="d4h-stat-value" id="d4h-stat-unique-participants">0</span>
+						<span class="d4h-stat-label"><?php esc_html_e( 'Unique participants', 'd4h-incidents' ); ?></span>
+					</div>
+					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-duration">0m</span>
 						<span class="d4h-stat-label"><?php esc_html_e( 'Total duration', 'd4h-incidents' ); ?></span>
 					</div>
@@ -568,24 +793,62 @@ final class Admin {
 				</div>
 
 				<div class="d4h-chart-section">
-					<h3><?php esc_html_e( 'Incident types', 'd4h-incidents' ); ?></h3>
-					<div class="d4h-chart-container">
-						<canvas id="d4h-chart-types"></canvas>
-						<div class="d4h-chart-export-buttons">
-							<button type="button" class="button d4h-export-png" data-chart="types"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
-							<button type="button" class="button d4h-export-csv" data-chart="types"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+					<h3><?php esc_html_e( 'Incidents and participants by period', 'd4h-incidents' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Incidents (left) and participants (right) per time period.', 'd4h-incidents' ); ?></p>
+					<div class="d4h-chart-controls">
+						<label for="d4h-participants-period"><?php esc_html_e( 'Period:', 'd4h-incidents' ); ?></label>
+						<select id="d4h-participants-period">
+							<option value="weekly"><?php esc_html_e( 'Weekly', 'd4h-incidents' ); ?></option>
+							<option value="monthly"><?php esc_html_e( 'Monthly', 'd4h-incidents' ); ?></option>
+							<option value="yearly"><?php esc_html_e( 'Yearly', 'd4h-incidents' ); ?></option>
+						</select>
+					</div>
+					<div class="d4h-charts-row">
+						<div class="d4h-chart-cell">
+							<h4 class="d4h-chart-subtitle"><?php esc_html_e( 'Incidents', 'd4h-incidents' ); ?></h4>
+							<div class="d4h-chart-container">
+								<canvas id="d4h-chart-incidents-by-period"></canvas>
+							</div>
+							<div class="d4h-chart-export-buttons">
+								<button type="button" class="button d4h-export-png" data-chart="incidents-by-period"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+								<button type="button" class="button d4h-export-csv" data-chart="incidents-by-period"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+							</div>
+						</div>
+						<div class="d4h-chart-cell">
+							<h4 class="d4h-chart-subtitle"><?php esc_html_e( 'Participants', 'd4h-incidents' ); ?></h4>
+							<div class="d4h-chart-container">
+								<canvas id="d4h-chart-participants"></canvas>
+							</div>
+							<div class="d4h-chart-export-buttons">
+								<button type="button" class="button d4h-export-png" data-chart="participants"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+								<button type="button" class="button d4h-export-csv" data-chart="participants"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+							</div>
 						</div>
 					</div>
 				</div>
 
 				<div class="d4h-chart-section">
-					<h3><?php esc_html_e( 'Participants by incident count', 'd4h-incidents' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'Total incidents each participant took part in (top 30).', 'd4h-incidents' ); ?></p>
+					<h3><?php esc_html_e( 'Incidents per member', 'd4h-incidents' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Number of incidents each member attended.', 'd4h-incidents' ); ?></p>
+					<div class="d4h-chart-controls">
+						<label for="d4h-incidents-per-member-limit"><?php esc_html_e( 'Show top:', 'd4h-incidents' ); ?></label>
+						<select id="d4h-incidents-per-member-limit">
+							<option value="30" selected>30</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+							<option value="200">200</option>
+							<option value="500">500</option>
+							<option value="0"><?php esc_html_e( 'All', 'd4h-incidents' ); ?></option>
+						</select>
+						<span class="d4h-chart-controls-divider">|</span>
+						<button type="button" id="d4h-incidents-per-member-show-names" class="button button-secondary"><?php esc_html_e( 'Show names', 'd4h-incidents' ); ?></button>
+						<span id="d4h-member-names-loading" class="d4h-attendance-loading" style="display:none;"><?php esc_html_e( 'Loading names...', 'd4h-incidents' ); ?></span>
+					</div>
 					<div class="d4h-chart-container">
-						<canvas id="d4h-chart-participants"></canvas>
+						<canvas id="d4h-chart-incidents-per-member"></canvas>
 						<div class="d4h-chart-export-buttons">
-							<button type="button" class="button d4h-export-png" data-chart="participants"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
-							<button type="button" class="button d4h-export-csv" data-chart="participants"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+							<button type="button" class="button d4h-export-png" data-chart="incidents-per-member"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+							<button type="button" class="button d4h-export-csv" data-chart="incidents-per-member"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
 						</div>
 					</div>
 				</div>

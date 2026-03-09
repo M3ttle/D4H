@@ -33,7 +33,8 @@ function d4h_incidents_get_config() {
 		'default_range_days' => 365,
 
 		// AJAX actions
-		'ajax_action_fetch'  => 'd4h_incidents_ajax_fetch',
+		'ajax_action_fetch'        => 'd4h_incidents_ajax_fetch',
+		'ajax_action_member_names' => 'd4h_incidents_ajax_fetch_member_names',
 		'ajax_action_export_excel' => 'd4h_incidents_ajax_export_excel',
 		'ajax_action_export_png'   => 'd4h_incidents_ajax_export_png',
 

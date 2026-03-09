@@ -103,11 +103,11 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 ### Features
 
 - **Time range selector**: 7 days, 30 days, 90 days, 1 year presets or custom date range.
-- **Statistics**: Total incidents, total participants (sum of countAttendance), incident types breakdown.
+- **Statistics**: Total incidents, total participants (sum of countAttendance), total duration.
 - **Incidents table**: Name, description (HTML stripped), date, duration, participants (countAttendance). Pagination with per-page selector (10/25/50/100/200).
 - **Charts**:  
-  - Incident types (doughnut)  
-  - Participants by incident count (horizontal bar, top 30)  
+  - Incidents and participants by period: two side-by-side charts (incidents on the left, participants on the right) with period selector (weekly/monthly/yearly). Numbers (incidents, total, unique) shown below the participants chart.  
+  - Incidents per member: number of incidents each member attended, with selector for how many to show (30/50/100/200/500/All).  
   - Incidents and participants by month and hour (bar)
 - **Exports**: Excel (CSV) with Name, Description, Date, Duration, Participants; PNG for each chart.
 - **API**: Uses `v3/{context}/{id}/incidents` with `after` and `before` query params. Same credentials as Calendar.

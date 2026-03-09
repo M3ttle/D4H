@@ -109,9 +109,50 @@
 	margin-bottom: 2.5em;
 	padding-top: 1px;
 }
+.d4h-chart-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	margin-bottom: 0.75em;
+}
+.d4h-chart-controls label {
+	margin: 0;
+}
+.d4h-chart-controls-divider {
+	color: #c3c4c7;
+	margin: 0 4px;
+}
+.d4h-radio-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+.d4h-attendance-loading {
+	padding: 0.5em 0;
+	color: #646970;
+	font-style: italic;
+}
+.d4h-charts-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2em;
+	margin: 1em 0;
+}
+.d4h-chart-cell {
+	flex: 1;
+	min-width: 360px;
+	max-width: 550px;
+}
+.d4h-chart-subtitle {
+	margin: 0 0 0.5em 0;
+	font-size: 1em;
+	font-weight: 600;
+}
 .d4h-chart-container {
 	position: relative;
-	max-width: 700px;
+	max-width: 900px;
 	height: 350px;
 	margin: 1em 0;
 }

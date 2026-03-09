@@ -5,11 +5,13 @@
 	var ajaxUrl = cfg.ajaxUrl || '';
 	var nonce = cfg.nonce || '';
 	var actionFetch = cfg.actionFetch || 'd4h_incidents_ajax_fetch';
+	var actionMemberNames = cfg.actionMemberNames || 'd4h_incidents_ajax_fetch_member_names';
 	var actionExportExcel = cfg.actionExportExcel || 'd4h_incidents_ajax_export_excel';
 	var actionExportPng = cfg.actionExportPng || 'd4h_incidents_ajax_export_png';
 
 	var charts = {};
 	var lastProcessed = null;
+	var memberIdToFirstName = {};
 	var currentPage = 1;
 	var perPage = 10;
 	var sortColumn = 'date';
@@ -117,12 +119,178 @@
 		charts = {};
 	}
 
+	function getParticipantsPeriod() {
+		var sel = document.getElementById('d4h-participants-period');
+		return (sel && sel.value) || 'weekly';
+	}
+
+	function getIncidentsPerMemberLimit() {
+		var sel = document.getElementById('d4h-incidents-per-member-limit');
+		var val = sel ? parseInt(sel.value, 10) : 30;
+		return (val > 0) ? val : 999999;
+	}
+
+	function renderIncidentsByPeriodChart(processed) {
+		var ctx = document.getElementById('d4h-chart-incidents-by-period');
+		if (!ctx || !processed || !processed.participants_over_time) return;
+
+		var period = getParticipantsPeriod();
+		var data = processed.participants_over_time[period];
+		if (!data || !data.labels || !data.labels.length) {
+			if (charts['incidents-by-period']) { charts['incidents-by-period'].destroy(); charts['incidents-by-period'] = null; }
+			return;
+		}
+
+		var labels = data.labels;
+		var incidentsData = data.incidents || [];
+
+		if (charts['incidents-by-period']) charts['incidents-by-period'].destroy();
+		charts['incidents-by-period'] = new Chart(ctx, {
+			type: 'bar',
+			data: {
+				labels: labels,
+				datasets: [{ label: 'Incidents', data: incidentsData, backgroundColor: '#3788d8' }]
+			},
+			options: {
+				responsive: true,
+				scales: {
+					x: { ticks: { maxRotation: 45 } },
+					y: { beginAtZero: true }
+				}
+			}
+		});
+	}
+
+	function renderParticipantsChart(processed) {
+		var ctxPart = document.getElementById('d4h-chart-participants');
+		if (!ctxPart || !processed || !processed.participants_over_time) return;
+
+		var period = getParticipantsPeriod();
+		var data = processed.participants_over_time[period];
+		if (!data || !data.labels || !data.labels.length) {
+			if (charts.participants) { charts.participants.destroy(); charts.participants = null; }
+			return;
+		}
+
+		var labels = data.labels;
+		var incidentsData = data.incidents || [];
+		var totalParticipantsData = data.participants || [];
+		var uniqueParticipantsData = data.unique_participants || [];
+
+		if (charts.participants) charts.participants.destroy();
+		charts.participants = new Chart(ctxPart, {
+			type: 'bar',
+			data: {
+				labels: labels,
+				datasets: [
+					{ label: 'Incidents', data: incidentsData, backgroundColor: '#3788d8' },
+					{ label: 'Total participants', data: totalParticipantsData, backgroundColor: '#28a745' },
+					{ label: 'Unique participants', data: uniqueParticipantsData, backgroundColor: '#17a2b8' }
+				]
+			},
+			options: {
+				responsive: true,
+				scales: {
+					x: { ticks: { maxRotation: 45 } },
+					y: { beginAtZero: true }
+				}
+			}
+		});
+	}
+
+	function getMemberLabel(memberId) {
+		var firstName = memberIdToFirstName[String(memberId)];
+		return (firstName != null && firstName !== '') ? firstName : String(memberId);
+	}
+
+	function renderIncidentsPerMemberChart(processed) {
+		var ctx = document.getElementById('d4h-chart-incidents-per-member');
+		if (!ctx) return;
+
+		var labels = [];
+		var data = [];
+		if (processed && processed.incidents_per_member_labels && processed.incidents_per_member_data) {
+			var limit = getIncidentsPerMemberLimit();
+			var allIds = processed.incidents_per_member_labels;
+			var allData = processed.incidents_per_member_data;
+			var sliceCount = limit >= allIds.length ? allIds.length : limit;
+			labels = allIds.slice(0, sliceCount).map(getMemberLabel);
+			data = allData.slice(0, sliceCount);
+		}
+
+		if (charts['incidents-per-member']) charts['incidents-per-member'].destroy();
+		charts['incidents-per-member'] = new Chart(ctx, {
+			type: 'bar',
+			data: {
+				labels: labels,
+				datasets: [{ label: 'Incidents', data: data, backgroundColor: '#3788d8' }]
+			},
+			options: {
+				responsive: true,
+				plugins: { legend: { display: false } },
+				scales: {
+					x: { ticks: { maxRotation: 90, minRotation: 45 } },
+					y: { beginAtZero: true }
+				}
+			}
+		});
+	}
+
+	function fetchMemberNamesAndRefresh() {
+		if (!lastProcessed || !lastProcessed.incidents_per_member_labels || lastProcessed.incidents_per_member_labels.length === 0) {
+			showMessage('No member data. Fetch incidents first.', 'error');
+			return;
+		}
+		var limit = getIncidentsPerMemberLimit();
+		var allIds = lastProcessed.incidents_per_member_labels;
+		var idsToFetch = limit >= allIds.length ? allIds.slice() : allIds.slice(0, limit);
+		if (idsToFetch.length === 0) return;
+
+		var loadingEl = document.getElementById('d4h-member-names-loading');
+		var btn = document.getElementById('d4h-incidents-per-member-show-names');
+		if (loadingEl) loadingEl.style.display = 'block';
+		if (btn) btn.disabled = true;
+
+		var formData = new FormData();
+		formData.append('action', actionMemberNames);
+		formData.append('nonce', nonce);
+		idsToFetch.forEach(function (id) { formData.append('member_ids[]', id); });
+
+		fetch(ajaxUrl, {
+			method: 'POST',
+			body: formData,
+			credentials: 'same-origin'
+		})
+			.then(function (r) { return r.json(); })
+			.then(function (resp) {
+				if (resp.success && resp.data && resp.data.names) {
+					Object.keys(resp.data.names).forEach(function (id) {
+						memberIdToFirstName[id] = resp.data.names[id];
+					});
+					renderIncidentsPerMemberChart(lastProcessed);
+					showMessage('Names loaded.', 'success');
+				} else {
+					showMessage((resp.data && resp.data.message) || 'Failed to load names.', 'error');
+				}
+			})
+			.catch(function () {
+				showMessage('Request failed.', 'error');
+			})
+			.finally(function () {
+				if (loadingEl) loadingEl.style.display = 'none';
+				if (btn) btn.disabled = false;
+			});
+	}
+
 	function renderCharts(processed) {
 		destroyCharts();
 		lastProcessed = processed;
+		memberIdToFirstName = {};
 
 		document.getElementById('d4h-stat-incidents').textContent = (processed.stats && processed.stats.total_incidents) || 0;
 		document.getElementById('d4h-stat-participants').textContent = (processed.stats && processed.stats.total_participants) || 0;
+		var uniqueEl = document.getElementById('d4h-stat-unique-participants');
+		if (uniqueEl) uniqueEl.textContent = (processed.stats && processed.stats.total_unique_participants) != null ? processed.stats.total_unique_participants : 0;
 		var durationEl = document.getElementById('d4h-stat-duration');
 		if (durationEl) durationEl.textContent = (processed.stats && processed.stats.total_duration_formatted) || '0m';
 		var avgParticipants = (processed.stats && processed.stats.average_participants_per_incident != null) ? processed.stats.average_participants_per_incident : 0;
@@ -135,34 +303,9 @@
 		currentPage = 1;
 		renderIncidentsTable(processed);
 
-		var ctxTypes = document.getElementById('d4h-chart-types');
-		if (ctxTypes && processed.chart_types_labels && processed.chart_types_data) {
-			charts.types = new Chart(ctxTypes, {
-				type: 'doughnut',
-				data: {
-					labels: processed.chart_types_labels,
-					datasets: [{ data: processed.chart_types_data, backgroundColor: ['#3788d8', '#6c757d', '#28a745', '#ffc107', '#dc3545', '#17a2b8'] }]
-				},
-				options: { responsive: true, maintainAspectRatio: true }
-			});
-		}
-
-		var ctxPart = document.getElementById('d4h-chart-participants');
-		if (ctxPart && processed.chart_participants_labels && processed.chart_participants_data) {
-			charts.participants = new Chart(ctxPart, {
-				type: 'bar',
-				data: {
-					labels: processed.chart_participants_labels,
-					datasets: [{ label: 'Incidents', data: processed.chart_participants_data, backgroundColor: '#3788d8' }]
-				},
-				options: {
-					indexAxis: 'y',
-					responsive: true,
-					plugins: { legend: { display: false } },
-					scales: { x: { beginAtZero: true } }
-				}
-			});
-		}
+		renderIncidentsByPeriodChart(processed);
+		renderParticipantsChart(processed);
+		renderIncidentsPerMemberChart(processed);
 
 		var mh = processed.chart_month_hour;
 		var ctxMH = document.getElementById('d4h-chart-month-hour');
@@ -295,19 +438,32 @@
 		}
 		var rows = [];
 		var filename = 'd4h-incidents-' + chartId + '.csv';
-		if (chartId === 'types') {
-			var labels = processed.chart_types_labels || [];
-			var data = processed.chart_types_data || [];
-			rows.push(['Type', 'Count']);
+		if (chartId === 'incidents-by-period') {
+			var period = getParticipantsPeriod();
+			var data = processed.participants_over_time && processed.participants_over_time[period];
+			var labels = (data && data.labels) || [];
+			var incidentsData = (data && data.incidents) || [];
+			rows.push(['Period', 'Incidents']);
 			for (var i = 0; i < labels.length; i++) {
-				rows.push([labels[i], data[i] || 0]);
+				rows.push([labels[i], incidentsData[i] || 0]);
 			}
 		} else if (chartId === 'participants') {
-			var participantLabels = processed.chart_participants_labels || [];
-			var participantData = processed.chart_participants_data || [];
-			rows.push(['Participant', 'Incident count']);
-			for (var j = 0; j < participantLabels.length; j++) {
-				rows.push([participantLabels[j], participantData[j] || 0]);
+			var period = getParticipantsPeriod();
+			var data = processed.participants_over_time && processed.participants_over_time[period];
+			var labels = (data && data.labels) || [];
+			var incidentsData = (data && data.incidents) || [];
+			var totalParticipantsData = (data && data.participants) || [];
+			var uniqueParticipantsData = (data && data.unique_participants) || [];
+			rows.push(['Period', 'Incidents', 'Total participants', 'Unique participants']);
+			for (var j = 0; j < labels.length; j++) {
+				rows.push([labels[j], incidentsData[j] || 0, totalParticipantsData[j] || 0, uniqueParticipantsData[j] != null ? uniqueParticipantsData[j] : '-']);
+			}
+		} else if (chartId === 'incidents-per-member') {
+			var memberLabels = (processed && processed.incidents_per_member_labels) || [];
+			var memberData = (processed && processed.incidents_per_member_data) || [];
+			rows.push(['Member ID', 'Incident count']);
+			for (var k = 0; k < memberLabels.length; k++) {
+				rows.push([memberLabels[k], memberData[k] || 0]);
 			}
 		} else if (chartId === 'month-hour') {
 			var mh = processed.chart_month_hour;
@@ -419,6 +575,28 @@
 				if (toInput) toInput.value = to.toISOString().slice(0, 10);
 			});
 		});
+
+		var periodSelect = document.getElementById('d4h-participants-period');
+		if (periodSelect) {
+			periodSelect.addEventListener('change', function () {
+				if (lastProcessed) {
+					renderIncidentsByPeriodChart(lastProcessed);
+					renderParticipantsChart(lastProcessed);
+				}
+			});
+		}
+
+		var memberLimitSelect = document.getElementById('d4h-incidents-per-member-limit');
+		if (memberLimitSelect) {
+			memberLimitSelect.addEventListener('change', function () {
+				if (lastProcessed) renderIncidentsPerMemberChart(lastProcessed);
+			});
+		}
+
+		var showNamesBtn = document.getElementById('d4h-incidents-per-member-show-names');
+		if (showNamesBtn) {
+			showNamesBtn.addEventListener('click', fetchMemberNamesAndRefresh);
+		}
 
 		var exportBtn = document.getElementById('d4h-incidents-export-excel');
 		if (exportBtn) exportBtn.addEventListener('click', exportExcel);
