@@ -54,21 +54,23 @@
 		return ids;
 	}
 
+	function isTagChecked(tagId, selectedTagIds) {
+		return selectedTagIds.length === 0 || selectedTagIds.indexOf(tagId) >= 0;
+	}
+
 	function renderTagFilter(processed) {
 		var checkboxesWrap = document.getElementById('d4h-incidents-tag-checkboxes');
 		if (!checkboxesWrap) return;
-		var allTags = (processed && processed.all_tags) || [];
-		if (allTags.length === 0 && (cfg && cfg.initialTags && cfg.initialTags.length > 0)) {
-			allTags = cfg.initialTags;
-		}
-		var hasTags = allTags.length > 0;
+		var selectedTagIds = getSelectedTagIds();
+		var allTags = (cfg && cfg.initialTags) ? cfg.initialTags.slice() : [];
 		var incidentsList = (processed && processed.stats && processed.stats.incidents_list) || [];
 		var hasNoTagInData = incidentsList.some(function (item) {
 			return !(item.tag_ids && item.tag_ids.length > 0);
 		});
 		var html = '';
 		if (hasNoTagInData) {
-			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '" checked /> No tag</label>';
+			var noTagChecked = isTagChecked(NO_TAG_VALUE, selectedTagIds);
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '"' + (noTagChecked ? ' checked' : '') + ' /> No tag</label>';
 		}
 		var sortedTags = allTags.slice().sort(function (a, b) {
 			var nameA = String(a.name || a.id || '');
@@ -76,7 +78,9 @@
 			return nameA.localeCompare(nameB);
 		});
 		sortedTags.forEach(function (tag) {
-			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(String(tag.id)) + '" checked /> ' + escapeHtml(tag.name || String(tag.id)) + '</label>';
+			var tagId = String(tag.id);
+			var checked = isTagChecked(tagId, selectedTagIds);
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(tagId) + '"' + (checked ? ' checked' : '') + ' /> ' + escapeHtml(tag.name || tagId) + '</label>';
 		});
 		if (!html && incidentsList.length > 0) {
 			html = '<span class="description">No tags in fetched data.</span>';
@@ -138,7 +142,8 @@
 					var locationCell = locationUrl ? '<a href="' + escapeHtml(locationUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(locationCoords) + '</a>' : '-';
 					var title = escapeHtml(item.title || item.name || '');
 					var description = escapeHtml(item.description || '');
-					var tagNames = (item.tag_names || []).join(', ') || '—';
+					var tagNamesRaw = item.tag_names || [];
+					var tagNames = (tagNamesRaw.length > 0) ? tagNamesRaw.map(getTagDisplayName).join(', ') : '—';
 					var duration = item.duration || '';
 					var participantsCount = (item.participants != null) ? Number(item.participants) : 0;
 					return '<tr><td>' + date + '</td><td>' + locationCell + '</td><td>' + title + '</td><td>' + description + '</td><td>' + escapeHtml(tagNames) + '</td><td>' + duration + '</td><td>' + participantsCount + '</td></tr>';
@@ -256,6 +261,16 @@
 		return (firstName != null && firstName !== '') ? firstName : String(memberId);
 	}
 
+	function getTagDisplayName(tagIdOrName) {
+		var idStr = String(tagIdOrName);
+		if (idStr === '-1' || idStr === '') return 'No tag';
+		var tags = (cfg && cfg.initialTags) || [];
+		for (var i = 0; i < tags.length; i++) {
+			if (String(tags[i].id) === idStr) return tags[i].name || idStr;
+		}
+		return idStr;
+	}
+
 	function renderIncidentsPerTagBoxes(processed) {
 		var container = document.getElementById('d4h-incidents-per-tag-boxes');
 		var section = document.getElementById('d4h-incidents-per-tag-cards');
@@ -267,7 +282,8 @@
 		}
 		section.style.display = 'block';
 		container.innerHTML = perTag.map(function (item) {
-			return '<div class="d4h-stat-card"><span class="d4h-stat-value">' + escapeHtml(String(item.count || 0)) + '</span><span class="d4h-stat-label">' + escapeHtml(item.name || String(item.id)) + '</span></div>';
+			var displayName = (item.id === -1 || item.id === '-1') ? (item.name || 'No tag') : getTagDisplayName(item.id);
+			return '<div class="d4h-stat-card"><span class="d4h-stat-value">' + escapeHtml(String(item.count || 0)) + '</span><span class="d4h-stat-label">' + escapeHtml(displayName) + '</span></div>';
 		}).join('');
 	}
 
@@ -300,8 +316,9 @@
 		var datasets = tagKeys.map(function (tagKey, index) {
 			var tagInfo = tagsData[tagKey];
 			var seriesData = (tagInfo.data || []).map(function (v) { return parseInt(v, 10) || 0; });
+			var label = (tagInfo.id === -1 || tagInfo.id === '-1') ? (tagInfo.name || 'No tag') : getTagDisplayName(tagInfo.id);
 			return {
-				label: tagInfo.name || tagKey,
+				label: label,
 				data: seriesData,
 				backgroundColor: colors[index % colors.length],
 				borderColor: colors[index % colors.length],
@@ -588,7 +605,10 @@
 			var labels = (data && data.labels) || [];
 			var tagsData = (data && data.tags) || {};
 			var tagKeys = Object.keys(tagsData);
-			var header = ['Period'].concat(tagKeys.map(function (k) { return tagsData[k].name || k; }));
+			var header = ['Period'].concat(tagKeys.map(function (k) {
+				var info = tagsData[k];
+				return (info.id === -1 || info.id === '-1') ? (info.name || 'No tag') : getTagDisplayName(info.id);
+			}));
 			rows.push(header);
 			for (var t = 0; t < labels.length; t++) {
 				var row = [labels[t]];
@@ -615,42 +635,44 @@
 	function renderTagFilterFromTags(allTags) {
 		var checkboxesWrap = document.getElementById('d4h-incidents-tag-checkboxes');
 		if (!checkboxesWrap) return;
-		if (!allTags || allTags.length === 0) return;
-		var html = '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '" checked /> No tag</label>';
+		allTags = Array.isArray(allTags) ? allTags : [];
+		if (allTags.length === 0) {
+			checkboxesWrap.innerHTML = '<span class="description">No tags yet. Run Update tags in D4H → Settings first.</span>';
+			return;
+		}
+		var selectedTagIds = getSelectedTagIds();
+		var noTagChecked = isTagChecked(NO_TAG_VALUE, selectedTagIds);
+		var html = '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + NO_TAG_VALUE + '"' + (noTagChecked ? ' checked' : '') + ' /> No tag</label>';
 		var sorted = allTags.slice().sort(function (a, b) {
 			var nameA = String(a.name || a.id || '');
 			var nameB = String(b.name || b.id || '');
 			return nameA.localeCompare(nameB);
 		});
 		sorted.forEach(function (tag) {
-			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(String(tag.id)) + '" checked /> ' + escapeHtml(tag.name || String(tag.id)) + '</label>';
+			var tagId = String(tag.id);
+			var checked = isTagChecked(tagId, selectedTagIds);
+			html += '<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="' + escapeHtml(tagId) + '"' + (checked ? ' checked' : '') + ' /> ' + escapeHtml(tag.name || tagId) + '</label>';
 		});
 		checkboxesWrap.innerHTML = html;
 	}
 
 	function init() {
-		var initialTags = (cfg && cfg.initialTags) || [];
-		if (initialTags.length > 0) {
-			renderTagFilterFromTags(initialTags);
-		}
+		renderTagFilterFromTags((cfg && cfg.initialTags) || []);
 
-		document.addEventListener('click', function (ev) {
-			var target = ev.target;
-			if (!target) return;
-			var toggle = target.id === 'd4h-incidents-tag-filter-toggle' ? target : (target.closest ? target.closest('#d4h-incidents-tag-filter-toggle') : null);
-			if (!toggle) return;
-			toggle = document.getElementById('d4h-incidents-tag-filter-toggle');
-			var content = document.getElementById('d4h-incidents-tag-filter-content');
-			if (!toggle || !content) return;
-			var showLabel = toggle.querySelector('.d4h-tag-filter-show');
-			var hideLabel = toggle.querySelector('.d4h-tag-filter-hide');
-			var hidden = content.style.display === 'none' || content.style.display === '';
-			content.style.display = hidden ? 'block' : 'none';
-			content.setAttribute('aria-hidden', hidden ? 'false' : 'true');
-			toggle.setAttribute('aria-expanded', hidden ? 'true' : 'false');
-			if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
-			if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
-		});
+		var toggleButton = document.getElementById('d4h-incidents-tag-filter-toggle');
+		var filterContent = document.getElementById('d4h-incidents-tag-filter-content');
+		if (toggleButton && filterContent) {
+			toggleButton.addEventListener('click', function () {
+				var showLabel = toggleButton.querySelector('.d4h-tag-filter-show');
+				var hideLabel = toggleButton.querySelector('.d4h-tag-filter-hide');
+				var hidden = filterContent.style.display === 'none' || filterContent.style.display === '';
+				filterContent.style.display = hidden ? 'block' : 'none';
+				filterContent.setAttribute('aria-hidden', hidden ? 'false' : 'true');
+				toggleButton.setAttribute('aria-expanded', hidden ? 'true' : 'false');
+				if (showLabel) showLabel.style.display = hidden ? 'none' : 'inline';
+				if (hideLabel) hideLabel.style.display = hidden ? 'inline' : 'none';
+			});
+		}
 
 		var fetchBtn = document.getElementById('d4h-incidents-fetch');
 		if (fetchBtn) fetchBtn.addEventListener('click', fetchData);

@@ -1167,34 +1167,7 @@ final class Admin {
 						<button type="button" class="button button-small d4h-tag-select-all"><?php esc_html_e( 'All', 'd4h-incidents' ); ?></button>
 						<button type="button" class="button button-small d4h-tag-select-none"><?php esc_html_e( 'None', 'd4h-incidents' ); ?></button>
 					</span>
-					<div id="d4h-incidents-tag-checkboxes" class="d4h-tag-checkboxes">
-					<?php
-					$core_tags = array();
-					if ( function_exists( 'd4h_core_get_tags_map' ) ) {
-						$core_tags = d4h_core_get_tags_map();
-					}
-					if ( empty( $core_tags ) ) {
-						$core_tags = get_option( 'd4h_core_tags_map', array() );
-					}
-					$core_tags = is_array( $core_tags ) ? $core_tags : array();
-					if ( ! empty( $core_tags ) ) {
-						$sorted = $core_tags;
-						asort( $sorted );
-						?>
-						<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="__no_tag__" checked /> <?php esc_html_e( 'No tag', 'd4h-incidents' ); ?></label>
-						<?php
-						foreach ( $sorted as $tag_id => $tag_name ) {
-							?>
-							<label class="d4h-tag-checkbox-item"><input type="checkbox" class="d4h-tag-filter-cb" data-tag-id="<?php echo esc_attr( (string) $tag_id ); ?>" checked /> <?php echo esc_html( $tag_name ); ?></label>
-							<?php
-						}
-					} else {
-						?>
-						<span class="description"><?php esc_html_e( 'No tags yet. Run Update tags in D4H → Settings first.', 'd4h-incidents' ); ?></span>
-						<?php
-					}
-					?>
-					</div>
+					<div id="d4h-incidents-tag-checkboxes" class="d4h-tag-checkboxes"><!-- populated by JS from initialTags --></div>
 				</div>
 			</div>
 
