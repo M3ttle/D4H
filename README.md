@@ -12,9 +12,9 @@ WordPress plugins that integrate with the **D4H Team Manager API** for emergency
 | **D4H Calendar** | Fetches events and exercises, stores them, displays in a public FullCalendar |
 | **D4H Incidents** | Fetches incidents, shows statistics, charts, exports to Excel/CSV and PNG |
 
-When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents. Credentials, API logs, and sync history are stored centrally in Core. Calendar and Incidents read from Core and no longer show their own credential forms.
+When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents. Credentials, API logs, and sync history are stored centrally in Core. Calendar and Incidents read from Core.
 
-Without Core, Calendar and Incidents add their pages under **Settings**. API credentials are configured in D4H Core.
+Without Core, Calendar and Incidents add their pages under **Settings**. API credentials must be configured in D4H Core (Core is required for Incidents).
 
 ### Recommended: Use D4H Core
 
@@ -97,19 +97,21 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 
 1. Copy `d4h-incidents` into `wp-content/plugins/` and activate.
 2. With Core: go to **D4H → Incidents**. Without Core: go to **Settings → D4H Incidents**.
-3. Enter credentials (if no Core). Select a time period (days, months, or 1 year), click **Fetch data**, then view statistics and charts.
+3. Configure API credentials in D4H Core. Select a time period (7/30/90/365 days or custom range), click **Fetch data**, then view statistics and charts.
 4. Export to Excel (CSV) or download chart images (PNG).
 
 ### Features
 
 - **Time range selector**: 7 days, 30 days, 90 days, 1 year presets or custom date range.
-- **Statistics**: Total incidents, total participants, incident types breakdown.
+- **Resource type**: Dropdown to filter by Incident (default), Event, or Exercise.
+- **Statistics**: Total incidents, total participants (sum of countAttendance), incident types breakdown.
+- **Incidents table**: Name, description (HTML stripped), date, duration, participants (countAttendance). Pagination with per-page selector (10/25/50/100/200).
 - **Charts**:  
   - Incident types (doughnut)  
   - Participants by incident count (horizontal bar, top 30)  
   - Incidents and participants by month and hour (bar)
-- **Exports**: Excel (CSV) for raw data; PNG for each chart.
-- **API**: Uses same D4H API base URL and credentials as Calendar; can reuse D4H Calendar credentials if both plugins are active.
+- **Exports**: Excel (CSV) with Name, Description, Date, Duration, Participants; PNG for each chart.
+- **API**: Uses `v3/{context}/{id}/incidents` with `after`, `before`, and `resource_type` query params. Same credentials as Calendar.
 
 ### Configuration
 
@@ -117,6 +119,7 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 
 - API base URL
 - `default_range_days`: default time range (365)
+- `attendance_path`: optional override path for attendance, e.g. `/v3/{context}/{context_id}/activities/{id}/attendance` (if D4H uses a different endpoint)
 - `update_github_repo`: GitHub repo for self-update
 
 ### Project structure

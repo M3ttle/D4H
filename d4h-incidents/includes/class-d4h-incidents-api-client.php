@@ -31,26 +31,28 @@ final class API_Client {
 	}
 
 	/**
-	 * Get incidents (paginated). Supports date filters.
-	 * Tries /incidents first; falls back to /activities with type=incident if 404.
+	 * Get incidents (paginated). Uses v3/team/{id}/incidents with date and resource_type filters.
 	 *
 	 * @param string               $context    'team' or 'organisation'
-	 * @param string               $context_id Context ID
-	 * @param array<string, mixed> $args       Optional: starts_after, ends_before, page, size
+	 * @param string               $context_id Context ID (e.g. 434)
+	 * @param array<string, mixed> $args       Optional: after, before, resource_type, page, size
 	 * @return array<int, array<string, mixed>>|\WP_Error
 	 */
 	public function get_incidents( string $context, string $context_id, array $args = array() ) {
 		$path = sprintf( '/v3/%s/%s/incidents', $context, $context_id );
-		$result = $this->fetch_paginated( $path, $args );
-		if ( is_wp_error( $result ) && $result->get_error_code() === 'd4h_api_error' ) {
-			$data = $result->get_error_data();
-			if ( is_array( $data ) && isset( $data['status'] ) && (int) $data['status'] === 404 ) {
-				$path   = sprintf( '/v3/%s/%s/activities', $context, $context_id );
-				$args   = array_merge( $args, array( 'type' => 'incident' ) );
-				$result = $this->fetch_paginated( $path, $args );
-			}
+		$query = array();
+		if ( ! empty( $args['after'] ) || ! empty( $args['starts_after'] ) ) {
+			$query['after'] = $args['after'] ?? $args['starts_after'];
 		}
-		return $result;
+		if ( ! empty( $args['before'] ) ) {
+			$query['before'] = $args['before'];
+		}
+		if ( ! empty( $args['resource_type'] ) && in_array( $args['resource_type'], array( 'Event', 'Exercise', 'Incident' ), true ) ) {
+			$query['resource_type'] = $args['resource_type'];
+		}
+		$query['page'] = $args['page'] ?? 0;
+		$query['size'] = $args['size'] ?? 100;
+		return $this->fetch_paginated( $path, array_merge( $args, $query ) );
 	}
 
 	/**
@@ -70,14 +72,25 @@ final class API_Client {
 
 	/**
 	 * Get activity attendance for an incident (participants).
+	 * Uses the path from config 'attendance_path' if set, otherwise the default.
+	 * Set config 'attendance_path' to override the path if D4H uses a different endpoint.
 	 *
-	 * @param string               $context    'team' or 'organisation'
-	 * @param string               $context_id Context ID
-	 * @param string               $incident_id Incident ID
+	 * @param string               $context     'team' or 'organisation'
+	 * @param string               $context_id  Context ID
+	 * @param string               $resource_id Incident or activity ID
 	 * @return array<int, array<string, mixed>>|\WP_Error
 	 */
-	public function get_incident_attendance( string $context, string $context_id, string $incident_id ) {
-		$path = sprintf( '/v3/%s/%s/incidents/%s/activity-attendance', $context, $context_id, $incident_id );
+	public function get_incident_attendance( string $context, string $context_id, string $resource_id ) {
+		$template = $this->config['attendance_path'] ?? null;
+		if ( is_string( $template ) && $template !== '' ) {
+			$path = str_replace(
+				array( '{context}', '{context_id}', '{id}' ),
+				array( $context, $context_id, $resource_id ),
+				$template
+			);
+		} else {
+			$path = sprintf( '/v3/%s/%s/incidents/%s/activity-attendance', $context, $context_id, $resource_id );
+		}
 		return $this->fetch_paginated( $path, array() );
 	}
 
@@ -110,7 +123,7 @@ final class API_Client {
 				: array();
 			$merged = array_merge( $merged, $results );
 
-			$total    = isset( $response['total'] ) ? (int) $response['total'] : 0;
+			$total    = isset( $response['totalSize'] ) ? (int) $response['totalSize'] : ( isset( $response['total'] ) ? (int) $response['total'] : 0 );
 			$page++;
 			$has_more = count( $results ) === $size && ( count( $merged ) < $total || $total === 0 );
 

@@ -17,6 +17,9 @@ function d4h_incidents_get_config() {
 		'api_base_url' => 'https://api.team-manager.us.d4h.com',
 		'whoami_path'  => '/v3/whoami',
 
+		// Attendance: set 'attendance_path' to override the default path if D4H uses a different endpoint
+		'attendance_path' => '',
+
 		// Option keys – can share with D4H Calendar or use own
 		'option_token'      => 'd4h_incidents_api_token',
 		'option_context'    => 'd4h_incidents_api_context',

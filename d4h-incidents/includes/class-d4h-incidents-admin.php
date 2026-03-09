@@ -23,7 +23,6 @@ final class Admin {
 
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu_page' ) );
-		add_action( 'admin_init', array( $this, 'handle_save_credentials' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
 		$action_fetch = $this->config['ajax_action_fetch'] ?? 'd4h_incidents_ajax_fetch';
@@ -81,46 +80,11 @@ final class Admin {
 		);
 	}
 
-	public function handle_save_credentials(): void {
-		if ( defined( 'D4H_CORE_ACTIVE' ) ) {
-			return;
-		}
-		$slug = $this->config['admin_menu_slug'] ?? 'd4h-incidents';
-		$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
-		if ( $page !== $slug ) {
-			return;
-		}
-		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
-			return;
-		}
-		if ( empty( $_POST['d4h_incidents_action'] ) || $_POST['d4h_incidents_action'] !== 'save_credentials' ) {
-			return;
-		}
-		if ( ! wp_verify_nonce( isset( $_POST['d4h_incidents_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_incidents_nonce'] ) ) : '', 'd4h_incidents_save_credentials' ) ) {
-			return;
-		}
-
-		$opt_token   = $this->config['option_token'] ?? 'd4h_incidents_api_token';
-		$opt_context = $this->config['option_context'] ?? 'd4h_incidents_api_context';
-		$opt_id      = $this->config['option_context_id'] ?? 'd4h_incidents_api_context_id';
-
-		$token   = isset( $_POST['d4h_incidents_api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_incidents_api_token'] ) ) : '';
-		$context = isset( $_POST['d4h_incidents_api_context'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_incidents_api_context'] ) ) : '';
-		$context_id = isset( $_POST['d4h_incidents_api_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['d4h_incidents_api_context_id'] ) ) : '';
-
-		update_option( $opt_token, $token, false );
-		update_option( $opt_context, $context, false );
-		update_option( $opt_id, $context_id, false );
-
-		$url = add_query_arg( array( 'page' => $slug, 'saved' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) );
-		wp_safe_redirect( $url );
-		exit;
-	}
-
 	public function enqueue_scripts( string $hook ): void {
 		$slug     = $this->config['admin_menu_slug'] ?? 'd4h-incidents';
 		$expected = defined( 'D4H_CORE_ACTIVE' ) ? 'd4h-core_page_' . $slug : 'settings_page_' . $slug;
-		if ( $hook !== $expected ) {
+		$page     = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $hook !== $expected && $page !== $slug ) {
 			return;
 		}
 
@@ -168,8 +132,9 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-incidents' ) ), 400 );
 		}
 
-		$from = isset( $_POST['from'] ) ? sanitize_text_field( wp_unslash( $_POST['from'] ) ) : '';
-		$to   = isset( $_POST['to'] ) ? sanitize_text_field( wp_unslash( $_POST['to'] ) ) : '';
+		$from          = isset( $_POST['from'] ) ? sanitize_text_field( wp_unslash( $_POST['from'] ) ) : '';
+		$to            = isset( $_POST['to'] ) ? sanitize_text_field( wp_unslash( $_POST['to'] ) ) : '';
+		$resource_type = isset( $_POST['resource_type'] ) ? sanitize_text_field( wp_unslash( $_POST['resource_type'] ) ) : 'Incident';
 
 		$default_days = (int) ( $this->config['default_range_days'] ?? 365 );
 		if ( $from === '' ) {
@@ -183,6 +148,10 @@ final class Admin {
 		$to_ts   = strtotime( $to );
 		if ( ! $from_ts || ! $to_ts || $from_ts > $to_ts ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid date range.', 'd4h-incidents' ) ), 400 );
+		}
+
+		if ( ! in_array( $resource_type, array( 'Event', 'Exercise', 'Incident' ), true ) ) {
+			$resource_type = 'Incident';
 		}
 
 		$api = new API_Client( $this->config, $token );
@@ -210,8 +179,9 @@ final class Admin {
 		}
 
 		$incidents = $api->get_incidents( $context, $context_id, array(
-			'starts_after'  => gmdate( 'Y-m-d', $from_ts ) . 'T00:00:00Z',
-			'ends_before'   => gmdate( 'Y-m-d', $to_ts ) . 'T23:59:59Z',
+			'after'         => gmdate( 'Y-m-d', $from_ts ) . 'T00:00:00Z',
+			'before'        => gmdate( 'Y-m-d', $to_ts ) . 'T23:59:59Z',
+			'resource_type' => $resource_type,
 		) );
 
 		if ( is_wp_error( $incidents ) ) {
@@ -220,7 +190,7 @@ final class Admin {
 
 		$processed = $this->process_incidents( $incidents, $api, $context, $context_id );
 
-		$transient_key = 'd4h_incidents_data_' . md5( $from . $to );
+		$transient_key = 'd4h_incidents_data_' . md5( $from . $to . $resource_type );
 		set_transient( $transient_key, array(
 			'from'      => $from,
 			'to'        => $to,
@@ -234,6 +204,7 @@ final class Admin {
 			'to'            => $to,
 		), false );
 
+		$processed['resource_type'] = $resource_type;
 		wp_send_json_success( $processed );
 	}
 
@@ -248,8 +219,13 @@ final class Admin {
 	 */
 	private function process_incidents( array $incidents, API_Client $api, string $context, string $context_id ): array {
 		$stats = array(
-			'total_incidents'   => count( $incidents ),
-			'total_participants' => 0,
+			'total_incidents'                   => count( $incidents ),
+			'total_participants'                => 0,
+			'total_duration_seconds'            => 0,
+			'total_duration_formatted'          => '',
+			'average_duration_seconds'          => 0,
+			'average_duration_formatted'        => '',
+			'average_participants_per_incident' => 0,
 			'types'             => array(),
 			'participant_counts' => array(),
 			'month_hour'        => array(),
@@ -259,11 +235,14 @@ final class Admin {
 		$participant_totals = array();
 		$month_hour_map     = array();
 
+		$stats['incidents_list'] = array();
+
 		foreach ( $incidents as $incident ) {
 			$type = $this->get_incident_type( $incident );
 			$stats['types'][ $type ] = ( $stats['types'][ $type ] ?? 0 ) + 1;
 
 			$starts_at = $incident['startsAt'] ?? $incident['starts_at'] ?? '';
+			$ends_at   = $incident['endsAt'] ?? $incident['ends_at'] ?? '';
 			$timestamp = is_numeric( $starts_at ) ? (int) $starts_at : strtotime( $starts_at );
 			if ( $timestamp ) {
 				$month = gmdate( 'Y-m', $timestamp );
@@ -275,17 +254,7 @@ final class Admin {
 				$month_hour_map[ $key ]['incidents']++;
 			}
 
-			$participants = $this->extract_participants( $incident );
-			$incident_id  = $incident['id'] ?? '';
-
-			if ( empty( $participants ) && $incident_id !== '' ) {
-				$attendance = $api->get_incident_attendance( $context, $context_id, (string) $incident_id );
-				if ( ! is_wp_error( $attendance ) ) {
-					$participants = $this->participants_from_attendance( $attendance );
-				}
-			}
-
-			$participant_count = count( $participants );
+			$participant_count = (int) ( $incident['countAttendance'] ?? $incident['count_attendance'] ?? 0 );
 			$stats['participants_by_incident'][] = $participant_count;
 			$stats['total_participants'] += $participant_count;
 
@@ -293,13 +262,22 @@ final class Admin {
 				$month_hour_map[ $key ]['participants'] += $participant_count;
 			}
 
-			foreach ( $participants as $participant_name ) {
-				$participant_totals[ $participant_name ] = ( $participant_totals[ $participant_name ] ?? 0 ) + 1;
-			}
+			$details = $this->extract_incident_details( $incident, $participant_count );
+			$stats['total_duration_seconds'] += $details['duration_seconds'];
+			$stats['incidents_list'][] = $details;
 		}
+
+		$stats['total_duration_formatted'] = $this->format_duration_seconds( $stats['total_duration_seconds'] );
+
+		$total_count = count( $incidents );
+		$stats['average_duration_seconds']   = $total_count > 0 ? (int) round( $stats['total_duration_seconds'] / $total_count ) : 0;
+		$stats['average_duration_formatted'] = $this->format_duration_seconds( $stats['average_duration_seconds'] );
 
 		arsort( $participant_totals );
 		$stats['participant_counts'] = $participant_totals;
+		$stats['average_participants_per_incident'] = $total_count > 0
+			? round( $stats['total_participants'] / $total_count, 1 )
+			: 0;
 
 		$months = array();
 		$hours  = range( 0, 23 );
@@ -339,45 +317,87 @@ final class Admin {
 		);
 	}
 
+	/**
+	 * Format seconds as e.g. "5h 30m" or "45m".
+	 *
+	 * @param int $seconds
+	 * @return string
+	 */
+	private function format_duration_seconds( int $seconds ): string {
+		if ( $seconds <= 0 ) {
+			return '0m';
+		}
+		$hours   = (int) floor( $seconds / 3600 );
+		$minutes = (int) floor( ( $seconds % 3600 ) / 60 );
+		$parts   = array();
+		if ( $hours > 0 ) {
+			$parts[] = $hours . 'h';
+		}
+		$parts[] = $minutes . 'm';
+		return implode( ' ', $parts );
+	}
+
+	/**
+	 * Extract incident details: title, location, description (HTML stripped), date, duration, participants (count).
+	 *
+	 * @param array<string, mixed> $incident
+	 * @param int                  $participant_count From countAttendance
+	 * @return array{title: string, name: string, location_coords: string, location_url: string, description: string, date: string, duration: string, duration_seconds: int, participants: int}
+	 */
+	private function extract_incident_details( array $incident, int $participant_count ): array {
+		$title = $incident['reference'] ?? $incident['referenceDescription'] ?? $incident['name'] ?? $incident['title'] ?? '';
+		$title = is_string( $title ) ? trim( $title ) : '';
+
+		$location_coords = '';
+		$location_url    = '';
+		$location        = $incident['location'] ?? null;
+		if ( is_array( $location ) && ! empty( $location['coordinates'] ) && is_array( $location['coordinates'] ) ) {
+			$coords = $location['coordinates'];
+			$lon    = isset( $coords[0] ) ? (float) $coords[0] : null;
+			$lat    = isset( $coords[1] ) ? (float) $coords[1] : null;
+			if ( $lat !== null && $lon !== null ) {
+				$location_coords = $lat . ', ' . $lon;
+				$location_url    = 'https://www.google.com/maps?q=' . $lat . ',' . $lon;
+			}
+		}
+
+		$description = $incident['description'] ?? '';
+		$description = is_string( $description ) ? trim( $description ) : '';
+		$description = wp_strip_all_tags( $description );
+
+		$starts_at = $incident['startsAt'] ?? $incident['starts_at'] ?? '';
+		$ends_at   = $incident['endsAt'] ?? $incident['ends_at'] ?? '';
+		$start_ts  = is_numeric( $starts_at ) ? (int) $starts_at : strtotime( $starts_at );
+		$end_ts    = is_numeric( $ends_at ) ? (int) $ends_at : strtotime( $ends_at );
+
+		$date = $start_ts ? gmdate( 'Y-m-d H:i', $start_ts ) : '';
+
+		$duration_seconds = 0;
+		$duration         = '';
+		if ( $start_ts && $end_ts && $end_ts >= $start_ts ) {
+			$duration_seconds = $end_ts - $start_ts;
+			$duration         = $this->format_duration_seconds( $duration_seconds );
+		}
+
+		return array(
+			'title'            => $title,
+			'name'             => $title,
+			'location_coords'  => $location_coords,
+			'location_url'     => $location_url,
+			'description'      => $description,
+			'date'             => $date,
+			'duration'         => $duration,
+			'duration_seconds' => $duration_seconds,
+			'participants'     => $participant_count,
+		);
+	}
+
 	private function get_incident_type( array $incident ): string {
 		$type = $incident['type'] ?? $incident['referenceType'] ?? $incident['activityType'] ?? 'incident';
 		if ( is_string( $type ) && trim( $type ) !== '' ) {
 			return ucfirst( trim( $type ) );
 		}
 		return __( 'Incident', 'd4h-incidents' );
-	}
-
-	private function extract_participants( array $incident ): array {
-		$participants = array();
-		$attendance   = $incident['attendance'] ?? $incident['activityAttendance'] ?? $incident['participants'] ?? array();
-		if ( is_array( $attendance ) ) {
-			foreach ( $attendance as $item ) {
-				$member = $item['member'] ?? $item;
-				$name   = $member['name'] ?? $member['fullName'] ?? $member['firstName'] ?? '';
-				if ( is_array( $name ) ) {
-					$name = trim( ( $name['first'] ?? '' ) . ' ' . ( $name['last'] ?? '' ) );
-				}
-				if ( is_string( $name ) && trim( $name ) !== '' ) {
-					$participants[] = trim( $name );
-				}
-			}
-		}
-		return array_values( array_unique( $participants ) );
-	}
-
-	private function participants_from_attendance( array $attendance ): array {
-		$participants = array();
-		foreach ( $attendance as $item ) {
-			$member = $item['member'] ?? $item;
-			$name   = $member['name'] ?? $member['fullName'] ?? '';
-			if ( is_array( $name ) ) {
-				$name = trim( ( $name['first'] ?? '' ) . ' ' . ( $name['last'] ?? '' ) );
-			}
-			if ( is_string( $name ) && trim( $name ) !== '' ) {
-				$participants[] = trim( $name );
-			}
-		}
-		return array_values( array_unique( $participants ) );
 	}
 
 	public function ajax_export_excel(): void {
@@ -396,20 +416,22 @@ final class Admin {
 			wp_send_json_error( array( 'message' => __( 'Cached data expired. Fetch incidents again.', 'd4h-incidents' ) ), 400 );
 		}
 
-		$processed = $cached['processed'];
-		$stats     = $processed['stats'] ?? array();
-		$incidents = $cached['incidents'] ?? array();
+		$processed    = $cached['processed'];
+		$stats        = $processed['stats'] ?? array();
+		$incidents_list = $stats['incidents_list'] ?? array();
 
 		$csv_lines   = array();
-		$csv_lines[] = array( 'ID', 'Reference', 'Type', 'Started', 'Participant count' );
-		foreach ( $incidents as $incident ) {
-			$id       = $incident['id'] ?? '';
-			$ref      = $incident['reference'] ?? $incident['referenceDescription'] ?? '';
-			$type     = $this->get_incident_type( $incident );
-			$started  = $incident['startsAt'] ?? $incident['starts_at'] ?? '';
-			$participants = $this->extract_participants( $incident );
-			$count    = count( $participants );
-			$csv_lines[] = array( $id, $ref, $type, $started, $count );
+		$csv_lines[] = array( 'Date', 'Location', 'Title', 'Description', 'Duration', 'Participants' );
+		foreach ( $incidents_list as $item ) {
+			$participants_count = (int) ( $item['participants'] ?? 0 );
+			$csv_lines[] = array(
+				$item['date'] ?? '',
+				$item['location_coords'] ?? '',
+				$item['title'] ?? $item['name'] ?? '',
+				$item['description'] ?? '',
+				$item['duration'] ?? '',
+				$participants_count,
+			);
 		}
 
 		$output = "\xEF\xBB\xBF" . $this->array_to_csv( $csv_lines );
@@ -465,46 +487,10 @@ final class Admin {
 	}
 
 	public function render_page(): void {
-		list( $context, $context_id ) = $this->get_api_context();
 		$default_days = (int) ( $this->config['default_range_days'] ?? 365 );
-		$saved = isset( $_GET['saved'] ) && $_GET['saved'] === '1';
 		?>
 		<div class="wrap d4h-incidents-wrap">
 			<h1><?php echo esc_html( $this->config['admin_page_title'] ?? 'D4H Incidents' ); ?></h1>
-
-			<?php if ( $saved ) : ?>
-				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'd4h-incidents' ); ?></p></div>
-			<?php endif; ?>
-
-			<div class="d4h-incidents-section">
-				<h2><?php esc_html_e( 'API credentials', 'd4h-incidents' ); ?></h2>
-				<?php if ( defined( 'D4H_CORE_ACTIVE' ) ) : ?>
-					<p><?php esc_html_e( 'API credentials are managed in D4H → Settings.', 'd4h-incidents' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=d4h-core' ) ); ?>"><?php esc_html_e( 'Go to D4H Settings', 'd4h-incidents' ); ?></a></p>
-				<?php else : ?>
-					<?php $token = $this->get_token(); ?>
-					<form method="post" action="">
-						<?php wp_nonce_field( 'd4h_incidents_save_credentials', 'd4h_incidents_nonce' ); ?>
-						<input type="hidden" name="d4h_incidents_action" value="save_credentials" />
-						<table class="form-table">
-							<tr>
-								<th scope="row"><label for="d4h_incidents_api_token"><?php esc_html_e( 'API Token', 'd4h-incidents' ); ?></label></th>
-								<td><input type="password" id="d4h_incidents_api_token" name="d4h_incidents_api_token" value="<?php echo esc_attr( $token ); ?>" class="regular-text" autocomplete="off" /></td>
-							</tr>
-							<tr>
-								<th scope="row"><label for="d4h_incidents_api_context"><?php esc_html_e( 'Context (team or organisation)', 'd4h-incidents' ); ?></label></th>
-								<td><input type="text" id="d4h_incidents_api_context" name="d4h_incidents_api_context" value="<?php echo esc_attr( $context ); ?>" placeholder="team" class="regular-text" /></td>
-							</tr>
-							<tr>
-								<th scope="row"><label for="d4h_incidents_api_context_id"><?php esc_html_e( 'Context ID', 'd4h-incidents' ); ?></label></th>
-								<td><input type="text" id="d4h_incidents_api_context_id" name="d4h_incidents_api_context_id" value="<?php echo esc_attr( $context_id ); ?>" class="regular-text" /></td>
-							</tr>
-						</table>
-						<p class="submit"><input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Save credentials', 'd4h-incidents' ); ?>" /></p>
-					</form>
-				<?php endif; ?>
-			</div>
-
-			<hr />
 
 			<div class="d4h-incidents-section">
 				<h2><?php esc_html_e( 'Fetch incidents', 'd4h-incidents' ); ?></h2>
@@ -514,6 +500,12 @@ final class Admin {
 					<input type="date" id="d4h_incidents_from" value="<?php echo esc_attr( gmdate( 'Y-m-d', strtotime( "-{$default_days} days" ) ) ); ?>" />
 					<label for="d4h_incidents_to"><?php esc_html_e( 'To:', 'd4h-incidents' ); ?></label>
 					<input type="date" id="d4h_incidents_to" value="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>" />
+					<label for="d4h_incidents_resource_type"><?php esc_html_e( 'Type:', 'd4h-incidents' ); ?></label>
+					<select id="d4h_incidents_resource_type">
+						<option value="Incident" selected><?php esc_html_e( 'Incident', 'd4h-incidents' ); ?></option>
+						<option value="Event"><?php esc_html_e( 'Event', 'd4h-incidents' ); ?></option>
+						<option value="Exercise"><?php esc_html_e( 'Exercise', 'd4h-incidents' ); ?></option>
+					</select>
 					<button type="button" id="d4h-incidents-fetch" class="button button-primary"><?php esc_html_e( 'Fetch data', 'd4h-incidents' ); ?></button>
 					<span id="d4h-incidents-presets">
 						<button type="button" class="button button-small d4h-preset" data-days="7"><?php esc_html_e( '7 days', 'd4h-incidents' ); ?></button>
@@ -531,32 +523,96 @@ final class Admin {
 				<div class="d4h-incidents-stats-cards">
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-incidents">0</span>
-						<span class="d4h-stat-label"><?php esc_html_e( 'Total incidents', 'd4h-incidents' ); ?></span>
+						<span class="d4h-stat-label" id="d4h-stat-incidents-label"><?php esc_html_e( 'Total incidents', 'd4h-incidents' ); ?></span>
 					</div>
 					<div class="d4h-stat-card">
 						<span class="d4h-stat-value" id="d4h-stat-participants">0</span>
 						<span class="d4h-stat-label"><?php esc_html_e( 'Total participants', 'd4h-incidents' ); ?></span>
 					</div>
+					<div class="d4h-stat-card">
+						<span class="d4h-stat-value" id="d4h-stat-duration">0m</span>
+						<span class="d4h-stat-label"><?php esc_html_e( 'Total duration', 'd4h-incidents' ); ?></span>
+					</div>
+					<div class="d4h-stat-card">
+						<span class="d4h-stat-value" id="d4h-stat-avg-participants">0</span>
+						<span class="d4h-stat-label" id="d4h-stat-avg-label"><?php esc_html_e( 'Avg participants per incident', 'd4h-incidents' ); ?></span>
+					</div>
+					<div class="d4h-stat-card">
+						<span class="d4h-stat-value" id="d4h-stat-avg-duration">0m</span>
+						<span class="d4h-stat-label" id="d4h-stat-avg-duration-label"><?php esc_html_e( 'Avg duration per incident', 'd4h-incidents' ); ?></span>
+					</div>
 				</div>
 
-				<h3><?php esc_html_e( 'Incident types', 'd4h-incidents' ); ?></h3>
-				<div class="d4h-chart-container">
-					<canvas id="d4h-chart-types"></canvas>
-					<button type="button" class="button d4h-export-png" data-chart="types"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+				<div class="d4h-incidents-table-section">
+					<h3><?php esc_html_e( 'Incidents', 'd4h-incidents' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Date, location, title, description, duration, and participants.', 'd4h-incidents' ); ?></p>
+					<div class="d4h-incidents-table-paging">
+						<label for="d4h-incidents-per-page"><?php esc_html_e( 'Show', 'd4h-incidents' ); ?></label>
+						<select id="d4h-incidents-per-page">
+							<option value="10" selected>10</option>
+							<option value="25">25</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+							<option value="200">200</option>
+						</select>
+						<span><?php esc_html_e( 'per page', 'd4h-incidents' ); ?></span>
+						<span id="d4h-incidents-paging-info" class="d4h-paging-info"></span>
+						<span id="d4h-incidents-paging-buttons" class="d4h-paging-buttons"></span>
+					</div>
+					<div class="d4h-incidents-table-wrapper">
+						<table class="wp-list-table widefat fixed striped" id="d4h-incidents-table">
+							<thead>
+								<tr>
+									<th class="d4h-sortable" data-sort="date"><?php esc_html_e( 'Date', 'd4h-incidents' ); ?></th>
+									<th class="d4h-sortable" data-sort="location_coords"><?php esc_html_e( 'Location', 'd4h-incidents' ); ?></th>
+									<th class="d4h-sortable" data-sort="title"><?php esc_html_e( 'Title', 'd4h-incidents' ); ?></th>
+									<th><?php esc_html_e( 'Description', 'd4h-incidents' ); ?></th>
+									<th class="d4h-sortable" data-sort="duration"><?php esc_html_e( 'Duration', 'd4h-incidents' ); ?></th>
+									<th class="d4h-sortable" data-sort="participants"><?php esc_html_e( 'Participants', 'd4h-incidents' ); ?></th>
+								</tr>
+							</thead>
+							<tbody id="d4h-incidents-table-body">
+							</tbody>
+						</table>
+					</div>
+					<div class="d4h-incidents-table-export">
+						<button type="button" id="d4h-incidents-export-csv" class="button button-secondary"><?php esc_html_e( 'Export CSV (all incidents)', 'd4h-incidents' ); ?></button>
+					</div>
 				</div>
 
-				<h3><?php esc_html_e( 'Participants by incident count', 'd4h-incidents' ); ?></h3>
-				<p class="description"><?php esc_html_e( 'Total incidents each participant took part in (top 30).', 'd4h-incidents' ); ?></p>
-				<div class="d4h-chart-container">
-					<canvas id="d4h-chart-participants"></canvas>
-					<button type="button" class="button d4h-export-png" data-chart="participants"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+				<div class="d4h-chart-section">
+					<h3><?php esc_html_e( 'Incident types', 'd4h-incidents' ); ?></h3>
+					<div class="d4h-chart-container">
+						<canvas id="d4h-chart-types"></canvas>
+						<div class="d4h-chart-export-buttons">
+							<button type="button" class="button d4h-export-png" data-chart="types"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+							<button type="button" class="button d4h-export-csv" data-chart="types"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+						</div>
+					</div>
 				</div>
 
-				<h3><?php esc_html_e( 'Incidents by month and hour', 'd4h-incidents' ); ?></h3>
-				<p class="description"><?php esc_html_e( 'Heatmap of incidents and participants over time.', 'd4h-incidents' ); ?></p>
-				<div class="d4h-chart-container">
-					<canvas id="d4h-chart-month-hour"></canvas>
-					<button type="button" class="button d4h-export-png" data-chart="month-hour"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+				<div class="d4h-chart-section">
+					<h3><?php esc_html_e( 'Participants by incident count', 'd4h-incidents' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Total incidents each participant took part in (top 30).', 'd4h-incidents' ); ?></p>
+					<div class="d4h-chart-container">
+						<canvas id="d4h-chart-participants"></canvas>
+						<div class="d4h-chart-export-buttons">
+							<button type="button" class="button d4h-export-png" data-chart="participants"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+							<button type="button" class="button d4h-export-csv" data-chart="participants"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+						</div>
+					</div>
+				</div>
+
+				<div class="d4h-chart-section">
+					<h3><?php esc_html_e( 'Incidents by month and hour', 'd4h-incidents' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Heatmap of incidents and participants over time.', 'd4h-incidents' ); ?></p>
+					<div class="d4h-chart-container">
+						<canvas id="d4h-chart-month-hour"></canvas>
+						<div class="d4h-chart-export-buttons">
+							<button type="button" class="button d4h-export-png" data-chart="month-hour"><?php esc_html_e( 'Export PNG', 'd4h-incidents' ); ?></button>
+							<button type="button" class="button d4h-export-csv" data-chart="month-hour"><?php esc_html_e( 'Export CSV', 'd4h-incidents' ); ?></button>
+						</div>
+					</div>
 				</div>
 
 				<div class="d4h-incidents-export">
