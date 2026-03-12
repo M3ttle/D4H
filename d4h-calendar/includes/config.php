@@ -22,12 +22,13 @@ function d4h_calendar_get_config() {
 		// Option keys (API credentials from D4H Core)
 		'option_last_updated'=> 'd4h_calendar_last_updated',
 		'option_tags_map'    => 'd4h_calendar_tags_map', // id => name for resolving tag IDs
-		'option_event_color'   => 'd4h_calendar_event_color',
-		'option_exercise_color'=> 'd4h_calendar_exercise_color',
-		'option_tag_colors'   => 'd4h_calendar_tag_colors', // tag name => hex color
-		'option_tag_priority' => 'd4h_calendar_tag_priority', // ordered array of tag names (first = highest priority)
-		'option_calendar_content_height' => 'd4h_calendar_content_height',
-		'option_custom_css'              => 'd4h_calendar_custom_css',
+		'option_event_color'            => 'd4h_calendar_event_color',
+		'option_exercise_color'         => 'd4h_calendar_exercise_color',
+		'option_tag_colors'             => 'd4h_calendar_tag_colors', // tag name => hex color
+		'option_tag_priority'           => 'd4h_calendar_tag_priority', // ordered array of tag names (first = highest priority)
+		'option_calendar_content_height'=> 'd4h_calendar_content_height',
+		'option_custom_css'             => 'd4h_calendar_custom_css',
+		'option_show_description'       => 'd4h_calendar_show_description',
 
 		// Cron
 		'cron_interval_sec'  => 7200, // 2 hours

@@ -6,6 +6,7 @@
 	var defaultView = cfg.defaultView || 'dayGridMonth';
 	var locale = cfg.locale || 'is';
 	var contentHeight = (cfg.contentHeight === 'auto' || cfg.contentHeight < 200) ? 'auto' : cfg.contentHeight;
+	var showDescription = (typeof cfg.showDescription === 'boolean') ? cfg.showDescription : true;
 
 	function formatEventDate(d, allDay) {
 		d = toNativeDate(d);
@@ -35,7 +36,7 @@
 			html += '<dt>Tími</dt><dd>' + escapeHtml(startStr) + (endStr ? ' – ' + escapeHtml(endStr) : '') + '</dd>';
 		}
 		html += '<dt>Tegund</dt><dd>' + escapeHtml(props.resourceType === 'exercise' ? 'Æfing' : 'Viðburður') + '</dd>';
-		if (desc) {
+		if (showDescription && desc) {
 			html += '<dt>Lýsing</dt><dd class="d4h-calendar-modal-description">' + sanitizeHtmlForDisplay(desc) + '</dd>';
 		}
 		var tags = props.tags && Array.isArray(props.tags) ? props.tags : [];

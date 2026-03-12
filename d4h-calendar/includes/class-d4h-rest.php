@@ -156,6 +156,10 @@ final class REST {
 		$tag_priority        = is_array( $tag_priority_raw ) ? $tag_priority_raw : array();
 
 		$events = array();
+
+		$option_show_description = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
+		$show_description_raw    = get_option( $option_show_description, 1 );
+		$include_description     = (int) $show_description_raw === 1;
 		foreach ( $activities as $activity ) {
 			$type  = $activity['resource_type'] ?? 'event';
 			$title = $this->get_title( $activity );
@@ -196,6 +200,11 @@ final class REST {
 			$desc      = isset( $payload['description'] ) ? (string) $payload['description'] : '';
 			$ref       = isset( $payload['reference'] ) ? (string) $payload['reference'] : '';
 			$ref_desc  = isset( $payload['referenceDescription'] ) ? (string) $payload['referenceDescription'] : '';
+
+			if ( ! $include_description ) {
+				$desc     = '';
+				$ref_desc = '';
+			}
 
 			$event = array(
 				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,

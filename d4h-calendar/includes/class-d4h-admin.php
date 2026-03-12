@@ -245,11 +245,16 @@ final class Admin {
 		$config_default = (int) ( $this->config['calendar_content_height'] ?? 600 );
 		$raw         = isset( $_POST['d4h_calendar_content_height'] ) ? (int) $_POST['d4h_calendar_content_height'] : 0;
 
+		$show_description_option = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
+		$show_description_raw    = isset( $_POST['d4h_show_description'] ) ? (int) $_POST['d4h_show_description'] : 0;
+
 		if ( $raw >= 200 && $raw <= 2000 ) {
 			update_option( $option_key, $raw, false );
 		} else {
 			delete_option( $option_key );
 		}
+
+		update_option( $show_description_option, $show_description_raw === 1 ? 1 : 0, false );
 
 		$url = add_query_arg( array( 'page' => $this->config['admin_menu_slug'], 'saved' => '1' ), admin_url( defined( 'D4H_CORE_ACTIVE' ) ? 'admin.php' : 'options-general.php' ) );
 		wp_safe_redirect( $url );
@@ -465,6 +470,8 @@ final class Admin {
 			$config_content_height  = (int) ( $this->config['calendar_content_height'] ?? 600 );
 			$current_content_height = (int) get_option( $option_content_height, 0 );
 			$effective_content_height = $current_content_height >= 200 ? $current_content_height : $config_content_height;
+			$option_show_description = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
+			$show_description_value  = get_option( $option_show_description, 1 );
 			?>
 			<form method="post" action="">
 				<?php wp_nonce_field( 'd4h_calendar_save_calendar_content_height', 'd4h_calendar_nonce' ); ?>
@@ -475,6 +482,16 @@ final class Admin {
 						<td>
 							<input type="number" id="d4h_calendar_content_height" name="d4h_calendar_content_height" value="<?php echo esc_attr( $effective_content_height ); ?>" min="0" max="2000" step="50" class="small-text" />
 							<span class="description"><?php echo esc_html( sprintf( __( '200–2000 px. Enter 0 to use config default (%d).', 'd4h-calendar' ), $config_content_height ) ); ?></span>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Event description', 'd4h-calendar' ); ?></th>
+						<td>
+							<label for="d4h_show_description">
+								<input type="checkbox" id="d4h_show_description" name="d4h_show_description" value="1" <?php checked( (int) $show_description_value, 1 ); ?> />
+								<?php esc_html_e( 'Show description in event popup', 'd4h-calendar' ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'If disabled, the event popup will hide the description text.', 'd4h-calendar' ); ?></p>
 						</td>
 					</tr>
 				</table>

@@ -74,12 +74,13 @@ final class Shortcode {
 			wp_add_inline_style( 'd4h-calendar-front', $custom_css );
 		}
 
-		$default_view   = $this->config['calendar_default_view'] ?? 'dayGridMonth';
-		$calendar_locale = $this->config['calendar_locale'] ?? 'is';
-		$option_key      = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
-		$config_default  = (int) ( $this->config['calendar_content_height'] ?? 600 );
+		$default_view     = $this->config['calendar_default_view'] ?? 'dayGridMonth';
+		$calendar_locale  = $this->config['calendar_locale'] ?? 'is';
+		$option_key       = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
+		$config_default   = (int) ( $this->config['calendar_content_height'] ?? 600 );
 		$content_height_raw = (int) get_option( $option_key, 0 );
 		$content_height     = $content_height_raw >= 200 ? $content_height_raw : 'auto';
+
 		$init_url     = plugin_dir_url( D4H_CALENDAR_PLUGIN_FILE ) . 'assets/calendar.js';
 
 		wp_enqueue_script(

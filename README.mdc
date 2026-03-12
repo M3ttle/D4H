@@ -1,0 +1,25 @@
+## D4H Calendar Plugin
+
+This project contains the D4H Calendar WordPress plugin, which displays a FullCalendar-based view of D4H activities via the `[d4h_calendar]` shortcode.
+
+### Usage
+
+- **Shortcode**: Add `[d4h_calendar]` to a post or page to render the calendar.
+- **Data source**: Events are synced from D4H via the configured API token in the D4H Core plugin.
+
+### Admin Settings
+
+Open the **D4H Calendar** settings page in the WordPress admin to configure:
+
+- **Update**
+  - Run a manual sync and view sync history.
+- **Sync interval**
+  - Control how often the calendar syncs from D4H when cron is enabled.
+- **Calendar display**
+  - **Content height (px)**: Set the visible calendar height or use the default.
+  - **Event description**: Toggle whether each event popup shows the synced description text.
+- **Event colors**
+  - Configure colors for events, exercises, and individual tags, including tag priority.
+- **Custom CSS**
+  - Add custom CSS that is loaded after the plugin stylesheet for fine-grained styling.
+
