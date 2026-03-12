@@ -36,6 +36,10 @@
 			html += '<dt>Tími</dt><dd>' + escapeHtml(startStr) + (endStr ? ' – ' + escapeHtml(endStr) : '') + '</dd>';
 		}
 		html += '<dt>Tegund</dt><dd>' + escapeHtml(props.resourceType === 'exercise' ? 'Æfing' : 'Viðburður') + '</dd>';
+		var eventUrl = props.eventUrl || '';
+		if (eventUrl) {
+			html += '<dt>Viðburður</dt><dd><a href="' + escapeHtml(eventUrl) + '" target="_blank" rel="noopener noreferrer">' + "D4H Team Manager" + '</a></dd>';
+		}
 		if (showDescription && desc) {
 			html += '<dt>Lýsing</dt><dd class="d4h-calendar-modal-description">' + sanitizeHtmlForDisplay(desc) + '</dd>';
 		}

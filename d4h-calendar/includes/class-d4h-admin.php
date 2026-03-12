@@ -247,6 +247,12 @@ final class Admin {
 
 		$show_description_option = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
 		$show_description_raw    = isset( $_POST['d4h_show_description'] ) ? (int) $_POST['d4h_show_description'] : 0;
+		$option_team_manager_url = $this->config['option_team_manager_base_url'] ?? 'd4h_calendar_team_manager_base_url';
+		$team_manager_base_url   = isset( $_POST['d4h_team_manager_base_url'] ) ? esc_url_raw( wp_unslash( $_POST['d4h_team_manager_base_url'] ), array( 'https' ) ) : '';
+		if ( $team_manager_base_url !== '' ) {
+			$team_manager_base_url = rtrim( $team_manager_base_url, '/' );
+		}
+		update_option( $option_team_manager_url, $team_manager_base_url, false );
 
 		if ( $raw >= 200 && $raw <= 2000 ) {
 			update_option( $option_key, $raw, false );
@@ -466,13 +472,15 @@ final class Admin {
 
 			<h2><?php esc_html_e( 'Calendar display', 'd4h-calendar' ); ?></h2>
 			<?php
-			$option_content_height  = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
-			$config_content_height  = (int) ( $this->config['calendar_content_height'] ?? 600 );
-			$current_content_height = (int) get_option( $option_content_height, 0 );
-			$effective_content_height = $current_content_height >= 200 ? $current_content_height : $config_content_height;
-			$option_show_description = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
-			$show_description_value  = get_option( $option_show_description, 1 );
-			?>
+		$option_content_height  = $this->config['option_calendar_content_height'] ?? 'd4h_calendar_content_height';
+		$config_content_height  = (int) ( $this->config['calendar_content_height'] ?? 600 );
+		$current_content_height = (int) get_option( $option_content_height, 0 );
+		$effective_content_height = $current_content_height >= 200 ? $current_content_height : $config_content_height;
+		$option_show_description = $this->config['option_show_description'] ?? 'd4h_calendar_show_description';
+		$show_description_value  = get_option( $option_show_description, 1 );
+		$option_team_manager_url = $this->config['option_team_manager_base_url'] ?? 'd4h_calendar_team_manager_base_url';
+		$team_manager_base_url   = get_option( $option_team_manager_url, '' );
+		?>
 			<form method="post" action="">
 				<?php wp_nonce_field( 'd4h_calendar_save_calendar_content_height', 'd4h_calendar_nonce' ); ?>
 				<input type="hidden" name="d4h_calendar_action" value="save_calendar_content_height" />
@@ -492,6 +500,13 @@ final class Admin {
 								<?php esc_html_e( 'Show description in event popup', 'd4h-calendar' ); ?>
 							</label>
 							<p class="description"><?php esc_html_e( 'If disabled, the event popup will hide the description text.', 'd4h-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="d4h_team_manager_base_url"><?php esc_html_e( 'D4H Team Manager base URL', 'd4h-calendar' ); ?></label></th>
+						<td>
+							<input type="url" id="d4h_team_manager_base_url" name="d4h_team_manager_base_url" value="<?php echo esc_attr( $team_manager_base_url ); ?>" class="regular-text" placeholder="https://xxx.team-manager.us.d4h.com" />
+							<p class="description"><?php esc_html_e( 'Base URL for D4H Team Manager (e.g. https://xxx.team-manager.us.d4h.com). If set, event popups will include a link to view the event in D4H.', 'd4h-calendar' ); ?></p>
 						</td>
 					</tr>
 				</table>

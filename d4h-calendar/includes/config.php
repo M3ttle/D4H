@@ -29,6 +29,7 @@ function d4h_calendar_get_config() {
 		'option_calendar_content_height'=> 'd4h_calendar_content_height',
 		'option_custom_css'             => 'd4h_calendar_custom_css',
 		'option_show_description'       => 'd4h_calendar_show_description',
+		'option_team_manager_base_url'  => 'd4h_calendar_team_manager_base_url',
 
 		// Cron
 		'cron_interval_sec'  => 7200, // 2 hours

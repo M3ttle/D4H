@@ -18,6 +18,7 @@ Open the **D4H Calendar** settings page in the WordPress admin to configure:
 - **Calendar display**
   - **Content height (px)**: Set the visible calendar height or use the default.
   - **Event description**: Toggle whether each event popup shows the synced description text.
+  - **D4H Team Manager base URL**: Optional base URL (e.g. `https://xxx.team-manager.us.d4h.com`). When set, event popups include a "Viðburður" link to view the event in D4H.
 - **Event colors**
   - Configure colors for events, exercises, and individual tags, including tag priority.
 - **Custom CSS**

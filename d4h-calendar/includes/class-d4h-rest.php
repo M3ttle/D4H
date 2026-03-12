@@ -206,8 +206,11 @@ final class REST {
 				$ref_desc = '';
 			}
 
+			$activity_id  = (string) ( $activity['id'] ?? '' );
+			$event_url    = $this->build_event_url( $activity_id, $type );
+
 			$event = array(
-				'id'            => sanitize_key( (string) ( $activity['id'] ?? '' ) ) . '-' . $type,
+				'id'            => sanitize_key( $activity_id ) . '-' . $type,
 				'title'         => $title,
 				'start'         => $start,
 				'color'         => $color,
@@ -217,6 +220,7 @@ final class REST {
 					'reference'           => $ref,
 					'referenceDescription'=> $ref_desc,
 					'tags'                => $tags,
+					'eventUrl'            => $event_url,
 				),
 			);
 			if ( $end !== null && $end !== '' ) {
@@ -260,6 +264,29 @@ final class REST {
 			}
 		}
 		return array_values( array_unique( $names ) );
+	}
+
+	/**
+	 * Build D4H Team Manager URL for an event or exercise.
+	 *
+	 * @param string $activity_id Raw activity ID from API.
+	 * @param string $resource_type 'event' or 'exercise'
+	 * @return string Full URL or empty string if base URL not configured.
+	 */
+	private function build_event_url( string $activity_id, string $resource_type ): string {
+		if ( $activity_id === '' ) {
+			return '';
+		}
+		$option_key = $this->config['option_team_manager_base_url'] ?? 'd4h_calendar_team_manager_base_url';
+		$base_url   = get_option( $option_key, '' );
+		if ( $base_url === '' || ! wp_http_validate_url( $base_url ) ) {
+			return '';
+		}
+		$base_url = rtrim( $base_url, '/' );
+		$path     = $resource_type === 'exercise'
+			? '/team/exercises/view/' . $activity_id
+			: '/team/events/view/' . $activity_id;
+		return $base_url . $path;
 	}
 
 	private function get_title( array $activity ): string {
