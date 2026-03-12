@@ -2,7 +2,7 @@
 /**
  * Plugin Name: D4H Incidents
  * Description: Fetches incidents from D4H Team Manager API, displays statistics, charts, and exports to Excel or PNG. Configure time period and view incident counts, participants, types, and heatmaps.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Nonni
  * License: GPL v2 or later
  * Text Domain: d4h-incidents
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const D4H_INCIDENTS_VERSION = '1.1.0';
+const D4H_INCIDENTS_VERSION = '1.1.1';
 const D4H_INCIDENTS_PLUGIN_FILE = __FILE__;
 const D4H_INCIDENTS_PLUGIN_DIR = __DIR__;
 
