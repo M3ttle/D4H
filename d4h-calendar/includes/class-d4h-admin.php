@@ -38,8 +38,10 @@ final class Admin {
 
 		$action_sync   = $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync';
 		$action_delete = $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete';
+		$action_clean  = $this->config['ajax_action_clean'] ?? 'd4h_calendar_ajax_clean';
 		add_action( 'wp_ajax_' . $action_sync, array( $this, 'ajax_sync' ) );
 		add_action( 'wp_ajax_' . $action_delete, array( $this, 'ajax_delete' ) );
+		add_action( 'wp_ajax_' . $action_clean, array( $this, 'ajax_clean' ) );
 	}
 
 	/**
@@ -110,14 +112,18 @@ final class Admin {
 			'nonce'        => wp_create_nonce( 'd4h_calendar_admin' ),
 			'actionSync'   => $this->config['ajax_action_sync'] ?? 'd4h_calendar_ajax_sync',
 			'actionDelete' => $this->config['ajax_action_delete'] ?? 'd4h_calendar_ajax_delete',
+			'actionClean'  => $this->config['ajax_action_clean'] ?? 'd4h_calendar_ajax_clean',
 			'i18n'         => array(
 				'lastSyncStatus' => __( 'Last sync status:', 'd4h-calendar' ),
 				'success'        => __( 'Success', 'd4h-calendar' ),
 				'error'          => __( 'Error', 'd4h-calendar' ),
 				'manual'         => __( 'Manual', 'd4h-calendar' ),
+				'manualClean'    => __( 'Manual (clean)', 'd4h-calendar' ),
 				'cron'           => __( 'Cron', 'd4h-calendar' ),
+				'cronClean'      => __( 'Cron (clean)', 'd4h-calendar' ),
 				'updating'       => __( 'Updating...', 'd4h-calendar' ),
 				'syncSuccess'    => __( 'Sync completed successfully.', 'd4h-calendar' ),
+				'cleanSuccess'   => __( 'Data cleaned and re-fetched. Calendar will show fresh data.', 'd4h-calendar' ),
 			),
 		) );
 	}
@@ -182,6 +188,80 @@ final class Admin {
 			'formatted_time' => wp_date( 'j M Y, H:i:s', $entry_time ),
 			'status'         => 'success',
 			'source'         => 'manual',
+			'duration_sec'   => round( $duration, 2 ),
+			'error'          => '',
+		);
+
+		wp_send_json_success( array(
+			'last_updated'       => $formatted,
+			'last_updated_ts'    => $updated,
+			'last_sync_status'   => 'success',
+			'last_sync_error'    => '',
+			'sync_history_entry' => $new_entry,
+		) );
+	}
+
+	/**
+	 * AJAX handler: Delete all calendar data and re-fetch from API. Cleans duplicates.
+	 */
+	public function ajax_clean(): void {
+		check_ajax_referer( 'd4h_calendar_admin', 'nonce' );
+		if ( ! current_user_can( $this->config['admin_capability'] ?? 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'd4h-calendar' ) ), 403 );
+		}
+
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : '';
+		if ( $token === '' ) {
+			wp_send_json_error( array( 'message' => __( 'API token not set.', 'd4h-calendar' ) ), 400 );
+		}
+
+		$this->repository->delete_all();
+
+		$api    = new API_Client( $this->config, $token );
+		$sync   = new Sync( $this->config, $api, $this->repository );
+		$start  = microtime( true );
+		$result = $sync->run_full_sync( true );
+		$duration = microtime( true ) - $start;
+
+		$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
+		$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+
+		if ( is_wp_error( $result ) ) {
+			$error_message = $result->get_error_message();
+			update_option( $option_error, $error_message, false );
+			update_option( $option_status, 'error', false );
+			Sync_History::log_sync( $this->config, 'error', $error_message, 'manual_clean', $duration, null, 'calendar' );
+			$entry_time = time();
+			$new_entry  = array(
+				'time'           => $entry_time,
+				'formatted_time' => wp_date( 'j M Y, H:i:s', $entry_time ),
+				'status'         => 'error',
+				'source'         => 'manual_clean',
+				'duration_sec'   => round( $duration, 2 ),
+				'error'          => $error_message,
+			);
+			wp_send_json_error( array(
+				'message'            => $error_message,
+				'last_sync_status'   => 'error',
+				'last_sync_error'    => $error_message,
+				'sync_history_entry' => $new_entry,
+			), 500 );
+		}
+
+		delete_option( $option_error );
+		update_option( $option_status, 'success', false );
+		Sync_History::log_sync( $this->config, 'success', '', 'manual_clean', $duration, null, 'calendar' );
+
+		$option_name_last_updated = $this->config['option_last_updated'] ?? 'd4h_calendar_last_updated';
+		$updated                  = get_option( $option_name_last_updated, 0 );
+		$formatted  = $updated ? wp_date( 'j M Y, H:i', $updated ) : __( 'Never', 'd4h-calendar' );
+
+		$entry_time = time();
+		$new_entry  = array(
+			'time'           => $entry_time,
+			'formatted_time' => wp_date( 'j M Y, H:i:s', $entry_time ),
+			'status'         => 'success',
+			'source'         => 'manual_clean',
 			'duration_sec'   => round( $duration, 2 ),
 			'error'          => '',
 		);
@@ -391,11 +471,13 @@ final class Admin {
 			</p>
 			<p>
 				<button type="button" id="d4h-update-now" class="button button-secondary"><?php esc_html_e( 'Update calendar', 'd4h-calendar' ); ?></button>
+				<button type="button" id="d4h-clean-data" class="button button-secondary"><?php esc_html_e( 'Clean data', 'd4h-calendar' ); ?></button>
 				<?php if ( ! empty( $this->config['enable_delete_btn'] ) ) : ?>
 					<?php $retention = (int) ( $this->config['retention_days'] ?? 90 ); ?>
 					<button type="button" id="d4h-delete-old" class="button button-secondary"><?php echo esc_html( sprintf( __( 'Delete data older than %d days', 'd4h-calendar' ), $retention ) ); ?></button>
 				<?php endif; ?>
 			</p>
+			<p class="description"><?php esc_html_e( 'Clean data: deletes all events/exercises and re-fetches from D4H. Use to remove duplicates. A cron job does this automatically every 12 hours.', 'd4h-calendar' ); ?></p>
 			<div id="d4h-admin-message" class="notice" style="display:none;"></div>
 
 			<h3><?php esc_html_e( 'Update history', 'd4h-calendar' ); ?></h3>
@@ -433,7 +515,12 @@ final class Admin {
 										<span style="color:#d63638;"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></span>
 									<?php endif; ?>
 								</td>
-								<td><?php echo esc_html( $source === 'cron' ? __( 'Cron', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) ); ?></td>
+								<td><?php
+								$source_label = ( $source === 'cron' || $source === 'cron_clean' )
+									? ( $source === 'cron_clean' ? __( 'Cron (clean)', 'd4h-calendar' ) : __( 'Cron', 'd4h-calendar' ) )
+									: ( $source === 'manual_clean' ? __( 'Manual (clean)', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) );
+								echo esc_html( $source_label );
+								?></td>
 								<td><?php echo $duration_sec !== null ? esc_html( number_format( $duration_sec, 2 ) . ' s' ) : '—'; ?></td>
 								<td><?php echo $error ? esc_html( $error ) : '—'; ?></td>
 							</tr>

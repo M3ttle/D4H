@@ -24,7 +24,12 @@ final class Cron {
 	public function register_hooks(): void {
 		add_filter( 'cron_schedules', array( $this, 'add_schedule' ) );
 		add_action( $this->config['cron_hook'] ?? 'd4h_calendar_sync', array( $this, 'run_sync' ) );
+
+		$clean_hook = $this->config['cron_clean_hook'] ?? 'd4h_calendar_clean_and_sync';
+		add_action( $clean_hook, array( $this, 'run_clean_and_sync' ) );
+
 		add_action( 'init', array( $this, 'maybe_reschedule' ) );
+		add_action( 'init', array( $this, 'maybe_schedule_clean' ) );
 	}
 
 	/**
@@ -157,6 +162,91 @@ final class Cron {
 		}
 	}
 
+	/** @var string Transient key for clean-and-sync lock. */
+	private const CLEAN_LOCK_KEY = 'd4h_calendar_clean_lock';
+
+	/**
+	 * Cron callback: delete all activities, then run full sync to re-fetch. Removes duplicates.
+	 */
+	public function run_clean_and_sync(): void {
+		if ( empty( $this->config['enable_cron'] ) ) {
+			return;
+		}
+
+		$token = function_exists( 'd4h_core_get_token' ) ? d4h_core_get_token() : '';
+		if ( $token === '' ) {
+			return;
+		}
+
+		$lock_ttl = (int) ( $this->config['cron_lock_ttl_sec'] ?? 900 );
+		if ( get_transient( self::CLEAN_LOCK_KEY ) ) {
+			return;
+		}
+		set_transient( self::CLEAN_LOCK_KEY, 1, $lock_ttl );
+
+		global $wpdb;
+		$config = $this->config;
+		$config['table_name'] = $wpdb->prefix . ( $config['table_name_prefix'] ?? 'd4h_calendar_' ) . 'activities';
+
+		$option_error  = $this->config['option_last_sync_error'] ?? 'd4h_calendar_last_sync_error';
+		$option_status = $this->config['option_last_sync_status'] ?? 'd4h_calendar_last_sync_status';
+		$start         = microtime( true );
+
+		try {
+			$database   = new Database( $config );
+			$repository = new Repository( $config, $database );
+			$api        = new API_Client( $config, $token );
+			$sync       = new Sync( $config, $api, $repository );
+
+			$repository->delete_all();
+			$result   = $sync->run_full_sync( false );
+			$duration = microtime( true ) - $start;
+
+			if ( is_wp_error( $result ) ) {
+				$error_message = $result->get_error_message();
+				update_option( $option_error, $error_message, false );
+				update_option( $option_status, 'error', false );
+				Sync_History::log_sync( $this->config, 'error', $error_message, 'cron_clean', $duration, null, 'calendar' );
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					error_log( 'D4H Calendar clean-and-sync cron failed: ' . $error_message );
+				}
+			} else {
+				delete_option( $option_error );
+				update_option( $option_status, 'success', false );
+				Sync_History::log_sync( $this->config, 'success', '', 'cron_clean', $duration, null, 'calendar' );
+			}
+		} catch ( \Throwable $exception ) {
+			$duration = microtime( true ) - $start;
+			$message  = $exception->getMessage();
+			update_option( $option_error, $message, false );
+			update_option( $option_status, 'error', false );
+			Sync_History::log_sync( $this->config, 'error', $message, 'cron_clean', $duration, null, 'calendar' );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( 'D4H Calendar clean-and-sync cron exception: ' . $message );
+			}
+		} finally {
+			delete_transient( self::CLEAN_LOCK_KEY );
+		}
+	}
+
+	/**
+	 * Schedule the clean-and-sync cron if not already scheduled.
+	 */
+	public function maybe_schedule_clean(): void {
+		if ( empty( $this->config['enable_cron'] ) ) {
+			return;
+		}
+
+		$hook_name  = $this->config['cron_clean_hook'] ?? 'd4h_calendar_clean_and_sync';
+		$schedule   = $this->config['cron_clean_schedule_name'] ?? 'd4h_calendar_12h';
+
+		if ( ! wp_next_scheduled( $hook_name ) ) {
+			wp_schedule_event( time(), $schedule, $hook_name );
+		}
+	}
+
 	/**
 	 * Schedule the cron event. Call on activation.
 	 */
@@ -195,14 +285,36 @@ final class Cron {
 	}
 
 	/**
-	 * Clear the cron event. Call on uninstall.
+	 * Schedule the clean-and-sync cron. Call on activation.
+	 */
+	public function schedule_clean(): void {
+		if ( empty( $this->config['enable_cron'] ) ) {
+			return;
+		}
+		$hook_name = $this->config['cron_clean_hook'] ?? 'd4h_calendar_clean_and_sync';
+		$schedule  = $this->config['cron_clean_schedule_name'] ?? 'd4h_calendar_12h';
+
+		if ( ! wp_next_scheduled( $hook_name ) ) {
+			wp_schedule_event( time(), $schedule, $hook_name );
+		}
+	}
+
+	/**
+	 * Clear the cron events. Call on uninstall.
 	 */
 	public static function unschedule( array $config ): void {
-		$hook_name         = $config['cron_hook'] ?? 'd4h_calendar_sync';
-		$next_run_timestamp = wp_next_scheduled( $hook_name );
-		if ( $next_run_timestamp ) {
-			wp_unschedule_event( $next_run_timestamp, $hook_name );
+		$hook_name = $config['cron_hook'] ?? 'd4h_calendar_sync';
+		$next_run  = wp_next_scheduled( $hook_name );
+		if ( $next_run ) {
+			wp_unschedule_event( $next_run, $hook_name );
 		}
 		wp_clear_scheduled_hook( $hook_name );
+
+		$clean_hook = $config['cron_clean_hook'] ?? 'd4h_calendar_clean_and_sync';
+		$next_run   = wp_next_scheduled( $clean_hook );
+		if ( $next_run ) {
+			wp_unschedule_event( $next_run, $clean_hook );
+		}
+		wp_clear_scheduled_hook( $clean_hook );
 	}
 }

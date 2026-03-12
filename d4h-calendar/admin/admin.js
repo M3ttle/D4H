@@ -59,7 +59,9 @@
 		var cronLabel = i18n.cron || 'Cron';
 		var statusText = (entry.status === 'success') ? successLabel : errorLabel;
 		var statusColor = (entry.status === 'success') ? '#00a32a' : '#d63638';
-		var sourceText = (entry.source === 'cron') ? cronLabel : manualLabel;
+		var cronCleanLabel = i18n.cronClean || cronLabel + ' (clean)';
+		var manualCleanLabel = i18n.manualClean || manualLabel + ' (clean)';
+		var sourceText = (entry.source === 'cron') ? cronLabel : ((entry.source === 'cron_clean') ? cronCleanLabel : ((entry.source === 'manual_clean') ? manualCleanLabel : manualLabel));
 		var durationText = (entry.duration_sec != null) ? Number(entry.duration_sec).toFixed(2) + ' s' : '—';
 		var errorText = entry.error || '—';
 		var timeText = entry.formatted_time || '—';
@@ -159,6 +161,51 @@
 			}
 		});
 	});
+
+	// Clean data: delete all and re-fetch
+	var cleanBtn = document.getElementById('d4h-clean-data');
+	if (cleanBtn) {
+		cleanBtn.addEventListener('click', function () {
+			if (!confirm('Delete all calendar data and re-fetch from D4H? This removes duplicates. The calendar will show fresh data after completion.')) return;
+
+			hideMessage();
+			setButtonLoading('d4h-clean-data', true, i18n.updating);
+
+			var formData = new FormData();
+			formData.append('action', cfg.actionClean || 'd4h_calendar_ajax_clean');
+			formData.append('nonce', nonce);
+
+			fetch(ajaxUrl, {
+				method: 'POST',
+				body: formData,
+				credentials: 'same-origin'
+			})
+				.then(function (r) { return r.json(); })
+				.then(function (data) {
+					var payload = data.data || {};
+					if (data.success) {
+						setLastUpdated(payload.last_updated);
+						setLastSyncStatus(payload.last_sync_status || 'success', payload.last_sync_error);
+						if (payload.sync_history_entry) {
+							prependSyncHistoryRow(payload.sync_history_entry);
+						}
+						showMessage(i18n.cleanSuccess || 'Data cleaned and re-fetched. Calendar will show fresh data.', 'success');
+					} else {
+						setLastSyncStatus(payload.last_sync_status || 'error', payload.last_sync_error || payload.message);
+						if (payload.sync_history_entry) {
+							prependSyncHistoryRow(payload.sync_history_entry);
+						}
+						showMessage(payload.message || 'Clean failed.', 'error');
+					}
+				})
+				.catch(function () {
+					showMessage('Request failed.', 'error');
+				})
+				.finally(function () {
+					setButtonLoading('d4h-clean-data', false);
+				});
+		});
+	}
 
 	// Delete old data
 	var deleteBtn = document.getElementById('d4h-delete-old');

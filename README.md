@@ -63,7 +63,8 @@ Fetches **events** and **exercises** from the D4H Team Manager API, stores them 
 ### Features
 
 - **Sync**: Automatic sync via cron (configurable interval) and manual “Retrieve Calendar data” on the admin page (events, exercises, and tags).
-- **Admin page**: Sync interval, calendar content height (200–2000 px), event colors (by type or tag), custom CSS, update history. API credentials and GitHub token are in D4H Core.
+- **Clean data**: Cron job every 12 hours deletes all events/exercises and re-fetches from D4H (removes duplicates). Admin "Clean data" button runs this manually.
+- **Admin page**: Update calendar, Clean data, Delete old data (retention), sync interval, calendar content height (200–2000 px), event colors (by type or tag), custom CSS, update history. API credentials and GitHub token are in D4H Core.
 - **Plugin updates**: Self-update from GitHub via **Plugins → Updates** when `update_github_repo` is set.
 - **Calendar**: FullCalendar with month/week/day views, event details modal.
 

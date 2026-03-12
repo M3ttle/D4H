@@ -53,5 +53,6 @@ register_activation_hook( D4H_CALENDAR_PLUGIN_FILE, function () {
 	if ( ! empty( $config['enable_cron'] ) ) {
 		$cron = new D4H_Calendar\Cron( $config );
 		$cron->schedule();
+		$cron->schedule_clean();
 	}
 } );

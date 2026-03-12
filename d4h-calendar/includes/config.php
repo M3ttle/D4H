@@ -57,11 +57,16 @@ function d4h_calendar_get_config() {
 
 		// Feature flags
 		'enable_cron'        => true,
-		'enable_delete_btn'  => false,
+		'enable_delete_btn'  => true,
 
 		// AJAX actions (admin-only)
 		'ajax_action_sync'   => 'd4h_calendar_ajax_sync',
 		'ajax_action_delete' => 'd4h_calendar_ajax_delete',
+		'ajax_action_clean'  => 'd4h_calendar_ajax_clean',
+
+		// Clean cron: delete all data and re-sync every 12 hours (removes duplicates)
+		'cron_clean_hook'           => 'd4h_calendar_clean_and_sync',
+		'cron_clean_schedule_name'  => 'd4h_calendar_12h',
 
 		// Self-update from GitHub releases via Plugins → Updates (owner/repo; empty to disable)
 		'update_github_repo' => 'M3ttle/D4H',

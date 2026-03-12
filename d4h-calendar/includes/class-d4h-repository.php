@@ -121,6 +121,18 @@ final class Repository {
 	}
 
 	/**
+	 * Delete all activities from the table. Used for cleaning duplicates before re-sync.
+	 *
+	 * @return int|false Number of rows deleted, or false on error.
+	 */
+	public function delete_all() {
+		global $wpdb;
+		$table = $this->database->get_table_name();
+
+		return $wpdb->query( "DELETE FROM {$table}" );
+	}
+
+	/**
 	 * Delete activities older than N days (by starts_at).
 	 *
 	 * @param int $days
