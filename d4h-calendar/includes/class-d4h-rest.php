@@ -263,19 +263,31 @@ final class REST {
 	}
 
 	private function get_title( array $activity ): string {
-		$payload = $activity['payload'] ?? array();
-		$raw     = '';
-		if ( isset( $payload['reference'] ) && (string) $payload['reference'] !== '' ) {
-			$raw = (string) $payload['reference'];
-		} elseif ( isset( $payload['referenceDescription'] ) && (string) $payload['referenceDescription'] !== '' ) {
-			$raw = (string) $payload['referenceDescription'];
+		$payload  = $activity['payload'] ?? array();
+		$ref      = isset( $payload['reference'] ) && (string) $payload['reference'] !== ''
+			? (string) $payload['reference']
+			: '';
+		$ref_desc = isset( $payload['referenceDescription'] ) && (string) $payload['referenceDescription'] !== ''
+			? (string) $payload['referenceDescription']
+			: '';
+
+		$base = '';
+		if ( $ref !== '' ) {
+			$base = $ref;
+		} elseif ( $ref_desc !== '' ) {
+			$base = $ref_desc;
 		} elseif ( isset( $payload['description'] ) && (string) $payload['description'] !== '' ) {
-			$raw = wp_trim_words( (string) $payload['description'], 8 );
+			$base = wp_trim_words( (string) $payload['description'], 8 );
 		} else {
 			return $activity['resource_type'] === 'exercise'
 				? __( 'Exercise', 'd4h-calendar' )
 				: __( 'Event', 'd4h-calendar' );
 		}
-		return esc_html( $raw );
+
+		// Append referenceDescription when different from base (e.g. reference).
+		if ( $ref_desc !== '' && $ref_desc !== $base ) {
+			$base = $base . ' – ' . $ref_desc;
+		}
+		return esc_html( $base );
 	}
 }
