@@ -1,0 +1,23 @@
+.d4h-log-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	align-items: center;
+	margin: 0.5em 0 1em;
+}
+
+.d4h-log-controls label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.d4h-log-summary {
+	flex: 1 0 100%;
+	margin: 0;
+}
+
+/* Show 10 rows before JS runs. */
+.d4h-log-table tbody tr.d4h-log-row:nth-child(n+11) {
+	display: none;
+}

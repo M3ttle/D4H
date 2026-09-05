@@ -25,19 +25,39 @@ final class Admin {
 		add_action( 'wp_ajax_d4h_core_update_tags', array( $this, 'ajax_update_tags' ) );
 	}
 
+	/**
+	 * Load scripts and styles on the D4H Settings page.
+	 */
 	public function enqueue_settings_scripts( string $hook ): void {
-		$slug = $this->config['admin_menu_slug'] ?? 'd4h-core';
+		$slug     = $this->config['admin_menu_slug'] ?? 'd4h-core';
 		$expected = 'toplevel_page_' . $slug;
 		if ( $hook !== $expected ) {
 			return;
 		}
-		wp_localize_script( 'jquery', 'd4hCoreSettings', array(
+
+		$plugin_url = plugin_dir_url( D4H_CORE_PLUGIN_FILE );
+		wp_enqueue_style(
+			'd4h-core-admin',
+			$plugin_url . 'admin/admin.css',
+			array(),
+			D4H_CORE_VERSION
+		);
+		wp_enqueue_script(
+			'd4h-core-admin',
+			$plugin_url . 'admin/admin.js',
+			array(),
+			D4H_CORE_VERSION,
+			true
+		);
+		wp_localize_script( 'd4h-core-admin', 'd4hCoreSettings', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'd4h_core_update_tags' ),
 			'i18n'    => array(
-				'updating' => __( 'Updating...', 'd4h-core' ),
-				'success'  => __( 'Tags updated successfully.', 'd4h-core' ),
-				'error'    => __( 'Failed to update tags.', 'd4h-core' ),
+				'updating'     => __( 'Updating...', 'd4h-core' ),
+				'success'      => __( 'Tags updated successfully.', 'd4h-core' ),
+				'error'        => __( 'Failed to update tags.', 'd4h-core' ),
+				'showingRows'  => __( 'Showing %1$d of %2$d matching rows.', 'd4h-core' ),
+				'truncated'    => __( 'Only the first %d are listed. Choose 100 rows to see more.', 'd4h-core' ),
 			),
 		) );
 	}
@@ -336,35 +356,43 @@ final class Admin {
 			<hr />
 
 			<h2><?php esc_html_e( 'Sync history', 'd4h-core' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Each row is one calendar (or other plugin) update. “Started by” says whether the timer ran it or someone clicked a button.', 'd4h-core' ); ?></p>
 			<?php
-			$history = Logger::get_sync_history( 100 );
+			$history = Logger::get_sync_history( 0 );
 			if ( empty( $history ) ) :
 				?>
 				<p class="description"><?php esc_html_e( 'No sync runs recorded yet.', 'd4h-core' ); ?></p>
 			<?php else : ?>
-				<table class="wp-list-table widefat fixed striped">
+				<?php $this->render_log_filters( 'd4h-sync-history', $this->unique_sources( $history ) ); ?>
+				<table class="wp-list-table widefat fixed striped d4h-log-table" id="d4h-sync-history">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Time', 'd4h-core' ); ?></th>
 							<th><?php esc_html_e( 'Source', 'd4h-core' ); ?></th>
 							<th><?php esc_html_e( 'Status', 'd4h-core' ); ?></th>
-							<th><?php esc_html_e( 'Trigger', 'd4h-core' ); ?></th>
+							<th><?php esc_html_e( 'Started by', 'd4h-core' ); ?></th>
 							<th><?php esc_html_e( 'Duration', 'd4h-core' ); ?></th>
 							<th><?php esc_html_e( 'Error', 'd4h-core' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
 						<?php foreach ( $history as $entry ) : ?>
-							<tr>
-								<td><?php echo esc_html( isset( $entry['time'] ) ? wp_date( 'j M Y, H:i:s', (int) $entry['time'] ) : '—' ); ?></td>
-								<td><?php echo esc_html( $entry['source'] ?? '—' ); ?></td>
+							<?php
+							$status = ( $entry['status'] ?? '' ) === 'success' ? 'success' : 'error';
+							$source = (string) ( $entry['source'] ?? '' );
+							$time   = (int) ( $entry['time'] ?? 0 );
+							?>
+							<tr class="d4h-log-row" data-time="<?php echo esc_attr( (string) $time ); ?>" data-source="<?php echo esc_attr( $source ); ?>" data-status="<?php echo esc_attr( $status ); ?>">
+								<td><?php echo $time ? esc_html( wp_date( 'j M Y, H:i:s', $time ) ) : '—'; ?></td>
+								<td><?php echo esc_html( $source !== '' ? $source : '—' ); ?></td>
 								<td>
 									<?php
-									$status = $entry['status'] ?? '';
-									echo $status === 'success' ? '<span style="color:#00a32a;">' . esc_html__( 'Success', 'd4h-core' ) . '</span>' : '<span style="color:#d63638;">' . esc_html__( 'Error', 'd4h-core' ) . '</span>';
+									echo $status === 'success'
+										? '<span style="color:#00a32a;">' . esc_html__( 'Success', 'd4h-core' ) . '</span>'
+										: '<span style="color:#d63638;">' . esc_html__( 'Error', 'd4h-core' ) . '</span>';
 									?>
 								</td>
-								<td><?php echo esc_html( ( $entry['trigger'] ?? '' ) === 'cron' ? __( 'Cron', 'd4h-core' ) : __( 'Manual', 'd4h-core' ) ); ?></td>
+								<td><?php echo esc_html( $this->trigger_label( (string) ( $entry['trigger'] ?? '' ) ) ); ?></td>
 								<td><?php echo isset( $entry['duration_sec'] ) && $entry['duration_sec'] !== null ? esc_html( number_format( (float) $entry['duration_sec'], 2 ) . ' s' ) : '—'; ?></td>
 								<td><?php echo esc_html( $entry['error'] ?? '' ); ?></td>
 							</tr>
@@ -376,13 +404,15 @@ final class Admin {
 			<hr />
 
 			<h2><?php esc_html_e( 'API logs', 'd4h-core' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Each row is one call to the D4H API. Failed calls (not 2xx) count as errors.', 'd4h-core' ); ?></p>
 			<?php
-			$logs = Logger::get_api_logs( 100 );
+			$logs = Logger::get_api_logs( 0 );
 			if ( empty( $logs ) ) :
 				?>
 				<p class="description"><?php esc_html_e( 'No API calls logged yet.', 'd4h-core' ); ?></p>
 			<?php else : ?>
-				<table class="wp-list-table widefat fixed striped">
+				<?php $this->render_log_filters( 'd4h-api-logs', $this->unique_sources( $logs ) ); ?>
+				<table class="wp-list-table widefat fixed striped d4h-log-table" id="d4h-api-logs">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Time', 'd4h-core' ); ?></th>
@@ -394,17 +424,110 @@ final class Admin {
 					</thead>
 					<tbody>
 						<?php foreach ( $logs as $entry ) : ?>
-							<tr>
-								<td><?php echo esc_html( isset( $entry['time'] ) ? wp_date( 'j M Y, H:i:s', (int) $entry['time'] ) : '—' ); ?></td>
+							<?php
+							$code   = (int) ( $entry['code'] ?? 0 );
+							$status = ( $code >= 200 && $code < 300 ) ? 'success' : 'error';
+							$source = (string) ( $entry['source'] ?? '' );
+							$time   = (int) ( $entry['time'] ?? 0 );
+							?>
+							<tr class="d4h-log-row" data-time="<?php echo esc_attr( (string) $time ); ?>" data-source="<?php echo esc_attr( $source ); ?>" data-status="<?php echo esc_attr( $status ); ?>">
+								<td><?php echo $time ? esc_html( wp_date( 'j M Y, H:i:s', $time ) ) : '—'; ?></td>
 								<td><code><?php echo esc_html( $entry['endpoint'] ?? '—' ); ?></code></td>
 								<td><?php echo esc_html( (string) ( $entry['code'] ?? '—' ) ); ?></td>
 								<td><?php echo isset( $entry['duration'] ) && $entry['duration'] !== null ? esc_html( number_format( (float) $entry['duration'], 2 ) . ' s' ) : '—'; ?></td>
-								<td><?php echo esc_html( $entry['source'] ?? '—' ); ?></td>
+								<td><?php echo esc_html( $source !== '' ? $source : '—' ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
 			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Plain-English label for how a sync was started.
+	 */
+	private function trigger_label( string $trigger ): string {
+		switch ( $trigger ) {
+			case 'cron':
+				return __( 'Scheduled', 'd4h-core' );
+			case 'cron_clean':
+				return __( 'Scheduled (full refresh)', 'd4h-core' );
+			case 'manual_clean':
+				return __( 'Clean data button', 'd4h-core' );
+			default:
+				return __( 'Update button', 'd4h-core' );
+		}
+	}
+
+	/**
+	 * Unique source names from log rows, for the filter dropdown.
+	 *
+	 * @param array<int, array<string, mixed>> $entries
+	 * @return array<int, string>
+	 */
+	private function unique_sources( array $entries ): array {
+		$sources = array();
+		foreach ( $entries as $entry ) {
+			$source = isset( $entry['source'] ) ? trim( (string) $entry['source'] ) : '';
+			if ( $source !== '' ) {
+				$sources[ $source ] = $source;
+			}
+		}
+		ksort( $sources );
+		return array_values( $sources );
+	}
+
+	/**
+	 * Row-count, source, status, and period filters for a log table.
+	 *
+	 * @param string             $table_id HTML id of the table
+	 * @param array<int, string> $sources
+	 */
+	private function render_log_filters( string $table_id, array $sources ): void {
+		$default_rows = (int) ( $this->config['log_table_default_rows'] ?? 10 );
+		$period_days  = (int) ( $this->config['log_error_retain_days'] ?? 60 );
+		?>
+		<div class="d4h-log-controls" data-table="<?php echo esc_attr( $table_id ); ?>">
+			<label>
+				<?php esc_html_e( 'Rows', 'd4h-core' ); ?>
+				<select class="d4h-log-rows">
+					<option value="10" <?php selected( $default_rows, 10 ); ?>>10</option>
+					<option value="20" <?php selected( $default_rows, 20 ); ?>>20</option>
+					<option value="100" <?php selected( $default_rows, 100 ); ?>>100</option>
+				</select>
+			</label>
+			<label>
+				<?php esc_html_e( 'Source', 'd4h-core' ); ?>
+				<select class="d4h-log-source">
+					<option value=""><?php esc_html_e( 'All', 'd4h-core' ); ?></option>
+					<?php foreach ( $sources as $source ) : ?>
+						<option value="<?php echo esc_attr( $source ); ?>"><?php echo esc_html( $source ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<label>
+				<?php esc_html_e( 'Status', 'd4h-core' ); ?>
+				<select class="d4h-log-status">
+					<option value=""><?php esc_html_e( 'All', 'd4h-core' ); ?></option>
+					<option value="success"><?php esc_html_e( 'Success', 'd4h-core' ); ?></option>
+					<option value="error"><?php esc_html_e( 'Error', 'd4h-core' ); ?></option>
+				</select>
+			</label>
+			<label>
+				<?php esc_html_e( 'Period', 'd4h-core' ); ?>
+				<select class="d4h-log-period">
+					<option value=""><?php esc_html_e( 'All time', 'd4h-core' ); ?></option>
+					<option value="<?php echo esc_attr( (string) $period_days ); ?>">
+						<?php echo esc_html( sprintf( __( 'Last %d days', 'd4h-core' ), $period_days ) ); ?>
+					</option>
+				</select>
+			</label>
+			<button type="button" class="button d4h-log-errors-60">
+				<?php echo esc_html( sprintf( __( 'Show errors (last %d days)', 'd4h-core' ), $period_days ) ); ?>
+			</button>
+			<p class="d4h-log-summary description"></p>
 		</div>
 		<?php
 	}

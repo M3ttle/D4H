@@ -55,12 +55,12 @@
 		if (emptyRow) emptyRow.remove();
 		var successLabel = i18n.success || 'Success';
 		var errorLabel = i18n.error || 'Error';
-		var manualLabel = i18n.manual || 'Manual';
-		var cronLabel = i18n.cron || 'Cron';
+		var manualLabel = i18n.manual || 'Update button';
+		var cronLabel = i18n.cron || 'Scheduled';
 		var statusText = (entry.status === 'success') ? successLabel : errorLabel;
 		var statusColor = (entry.status === 'success') ? '#00a32a' : '#d63638';
-		var cronCleanLabel = i18n.cronClean || cronLabel + ' (clean)';
-		var manualCleanLabel = i18n.manualClean || manualLabel + ' (clean)';
+		var cronCleanLabel = i18n.cronClean || 'Scheduled (full refresh)';
+		var manualCleanLabel = i18n.manualClean || 'Clean data button';
 		var sourceText = (entry.source === 'cron') ? cronLabel : ((entry.source === 'cron_clean') ? cronCleanLabel : ((entry.source === 'manual_clean') ? manualCleanLabel : manualLabel));
 		var durationText = (entry.duration_sec != null) ? Number(entry.duration_sec).toFixed(2) + ' s' : '—';
 		var errorText = entry.error || '—';

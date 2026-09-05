@@ -25,7 +25,9 @@ function d4h_core_get_config() {
 		'option_sync_history' => 'd4h_core_sync_history',
 		'option_github_token' => 'd4h_core_github_token',
 
-		'max_log_entries'   => 200,
+		'max_log_entries'        => 200,
+		'log_error_retain_days'  => 60,
+		'log_table_default_rows' => 10,
 		'admin_capability'  => 'manage_options',
 		'admin_menu_slug'   => 'd4h-core',
 	);

@@ -117,10 +117,10 @@ final class Admin {
 				'lastSyncStatus' => __( 'Last sync status:', 'd4h-calendar' ),
 				'success'        => __( 'Success', 'd4h-calendar' ),
 				'error'          => __( 'Error', 'd4h-calendar' ),
-				'manual'         => __( 'Manual', 'd4h-calendar' ),
-				'manualClean'    => __( 'Manual (clean)', 'd4h-calendar' ),
-				'cron'           => __( 'Cron', 'd4h-calendar' ),
-				'cronClean'      => __( 'Cron (clean)', 'd4h-calendar' ),
+				'manual'         => __( 'Update button', 'd4h-calendar' ),
+				'manualClean'    => __( 'Clean data button', 'd4h-calendar' ),
+				'cron'           => __( 'Scheduled', 'd4h-calendar' ),
+				'cronClean'      => __( 'Scheduled (full refresh)', 'd4h-calendar' ),
 				'updating'       => __( 'Updating...', 'd4h-calendar' ),
 				'syncSuccess'    => __( 'Sync completed successfully.', 'd4h-calendar' ),
 				'cleanSuccess'   => __( 'Data cleaned and re-fetched. Calendar will show fresh data.', 'd4h-calendar' ),
@@ -489,7 +489,7 @@ final class Admin {
 						<tr>
 							<th scope="col"><?php esc_html_e( 'Time', 'd4h-calendar' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Status', 'd4h-calendar' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Source', 'd4h-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Started by', 'd4h-calendar' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Duration', 'd4h-calendar' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Error', 'd4h-calendar' ); ?></th>
 						</tr>
@@ -517,8 +517,8 @@ final class Admin {
 								</td>
 								<td><?php
 								$source_label = ( $source === 'cron' || $source === 'cron_clean' )
-									? ( $source === 'cron_clean' ? __( 'Cron (clean)', 'd4h-calendar' ) : __( 'Cron', 'd4h-calendar' ) )
-									: ( $source === 'manual_clean' ? __( 'Manual (clean)', 'd4h-calendar' ) : __( 'Manual', 'd4h-calendar' ) );
+									? ( $source === 'cron_clean' ? __( 'Scheduled (full refresh)', 'd4h-calendar' ) : __( 'Scheduled', 'd4h-calendar' ) )
+									: ( $source === 'manual_clean' ? __( 'Clean data button', 'd4h-calendar' ) : __( 'Update button', 'd4h-calendar' ) );
 								echo esc_html( $source_label );
 								?></td>
 								<td><?php echo $duration_sec !== null ? esc_html( number_format( $duration_sec, 2 ) . ' s' ) : '—'; ?></td>

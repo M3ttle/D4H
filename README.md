@@ -29,6 +29,15 @@ Without Core, Calendar and Incidents add their pages under **Settings**. API cre
 
 Stores **shared API credentials** (token, context, context ID), **tags** (id → name), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar and Incidents use credentials; Incidents uses Core tags for filtering and display.
 
+On **D4H → Settings**, sync history and API logs show 10 rows by default. You can switch to 20 or 100 rows, and filter by source (calendar / incidents), status (success / error), and period (all time or last 60 days). Use **Show errors (last 60 days)** to list recent failures. Failed API calls and failed syncs from the last 60 days are kept even when older successful rows are dropped.
+
+**Started by** (sync history) uses plain labels:
+
+- **Scheduled** — timer, normal sync
+- **Scheduled (full refresh)** — timer, wipe and re-fetch
+- **Update button** — someone clicked Update calendar
+- **Clean data button** — someone clicked Clean data
+
 ### Quick start
 
 1. Copy `d4h-core` into `wp-content/plugins/` and activate.
@@ -45,6 +54,8 @@ Stores **shared API credentials** (token, context, context ID), **tags** (id →
 | `includes/functions.php` | `d4h_core_get_token()`, `d4h_core_get_context()`, `d4h_core_get_context_id()`, `d4h_core_get_tags_map()`, `d4h_core_get_github_token()` |
 | `includes/class-d4h-core-admin.php` | D4H menu, Settings page (credentials, GitHub token, sync history, API logs) |
 | `includes/class-d4h-core-logger.php` | API logs and sync history |
+| `admin/admin.js` | Log table row limits and filters |
+| `admin/admin.css` | Settings page styles |
 | `uninstall.php` | Cleans up on uninstall |
 
 ---

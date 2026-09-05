@@ -19,7 +19,7 @@ final class Sync_History {
 	 * @param array<string, mixed> $config    Plugin config.
 	 * @param string               $status   'success' or 'error'.
 	 * @param string               $error    Error message if status is error.
-	 * @param string               $trigger  'manual' or 'cron'.
+	 * @param string               $trigger  How the sync started (manual, cron, manual_clean, cron_clean).
 	 * @param float|null           $duration Duration in seconds (optional).
 	 * @param int|null             $items_count Number of items synced (optional).
 	 * @param string               $plugin   Plugin name for Core log (e.g. 'calendar').
@@ -47,7 +47,7 @@ final class Sync_History {
 			'time'         => time(),
 			'status'       => $status === 'success' ? 'success' : 'error',
 			'error'        => $error,
-			'source'       => $trigger === 'cron' ? 'cron' : 'manual',
+			'source'       => $trigger,
 			'duration_sec' => $duration,
 			'items_count'  => $items_count,
 		);

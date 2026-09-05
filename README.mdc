@@ -1,0 +1,56 @@
+# D4H WordPress Plugins
+
+WordPress plugins that pull team events, exercises, and incidents from the D4H Team Manager API and show them on a WordPress site.
+
+We keep API credentials in one place (D4H Core), then Calendar and Incidents use those credentials. Calendar stores events for a public calendar. Incidents fetches incident stats for charts and exports.
+
+## Technology
+
+- PHP (WordPress plugins)
+- JavaScript (admin pages and FullCalendar)
+- D4H Team Manager API v3 (HTTPS, Bearer token)
+- Optional GitHub releases for plugin updates
+
+## Plugins
+
+| Plugin | Purpose |
+|--------|---------|
+| **D4H Core** | Shared API credentials, tags, API logs, sync history. Parent admin menu. |
+| **D4H Calendar** | Fetches events and exercises, stores them, displays in a public FullCalendar |
+| **D4H Incidents** | Fetches incidents, shows statistics, charts, exports to Excel/CSV and PNG |
+
+## Quick start
+
+1. Copy `d4h-core`, `d4h-calendar`, and `d4h-incidents` into `wp-content/plugins/`.
+2. Activate **D4H Core** first, then Calendar and Incidents.
+3. Go to **D4H → Settings**, enter API token, context (team or organisation), and context ID.
+4. Use **D4H → Calendar** and **D4H → Incidents** for plugin-specific options.
+
+## End-user manual
+
+### Settings (D4H Core)
+
+- Enter the D4H API token, context, and context ID once. Calendar and Incidents share them.
+- Click **Update tags** so Incidents can show tag names.
+- **Sync history** and **API logs** show 10 rows by default. Change to 20 or 100. Filter by source, status, and period (all time or last 60 days). Click **Show errors (last 60 days)** to list recent failures.
+
+**Started by** means how a calendar update ran:
+
+- **Scheduled** — timer, normal sync
+- **Scheduled (full refresh)** — timer, wipe and re-fetch
+- **Update button** — someone clicked Update calendar
+- **Clean data button** — someone clicked Clean data
+
+Failed syncs and failed API calls from the last 60 days are kept even when older successful rows are dropped.
+
+### Calendar
+
+- **D4H → Calendar**: Update calendar, Clean data, sync interval, colors, and the public calendar shortcode `[d4h_calendar]`.
+
+### Incidents
+
+- **D4H → Incidents**: Pick a date range, click Fetch data, then view tables, charts, and exports.
+
+## Contribute
+
+This is a private project. If you change behaviour that this file describes, update this README in the same work.
