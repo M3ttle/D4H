@@ -1,0 +1,106 @@
+/* Admin styles for D4H Create Activity */
+
+.d4h-create-activity-wrap .d4h-ca-section {
+	margin: 1.5em 0;
+	padding: 1em 0;
+	border-top: 1px solid #c3c4c7;
+}
+
+.d4h-create-activity-wrap .d4h-ca-section:first-of-type {
+	border-top: none;
+}
+
+.d4h-create-activity-wrap .d4h-ca-tag-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4em;
+	margin: 0.5em 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.d4h-create-activity-wrap .d4h-ca-tag-chip {
+	display: inline-block;
+	padding: 0.2em 0.7em;
+	border: 1px solid #c3c4c7;
+	border-radius: 999px;
+	background: #fff;
+	font-size: 13px;
+}
+
+.d4h-create-activity-wrap .d4h-ca-column-list {
+	margin: 0.5em 0 1em 1.5em;
+	color: #646970;
+}
+
+.d4h-create-activity-wrap .d4h-ca-example {
+	margin: 0.3em 0 1em;
+	padding: 0.6em 0.8em;
+	overflow-x: auto;
+	border: 1px solid #c3c4c7;
+	background: #f6f7f7;
+	font-size: 12px;
+	white-space: pre;
+}
+
+.d4h-create-activity-wrap #d4h-ca-paste {
+	width: 100%;
+	max-width: 100%;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 13px;
+}
+
+.d4h-create-activity-wrap .d4h-ca-table-wrap {
+	overflow-x: auto;
+	margin: 1em 0;
+}
+
+.d4h-create-activity-wrap #d4h-ca-review-table th,
+.d4h-create-activity-wrap #d4h-ca-review-table td {
+	vertical-align: top;
+}
+
+.d4h-create-activity-wrap .d4h-ca-type-select {
+	min-width: 7em;
+}
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+	min-width: 160px;
+	max-height: 12em;
+	overflow-y: auto;
+}
+
+.d4h-create-activity-wrap .d4h-ca-tag-check {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.35em;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.d4h-create-activity-wrap .d4h-ca-row-invalid {
+	background: #fcf0f1 !important;
+}
+
+.d4h-create-activity-wrap .d4h-ca-ok {
+	color: #00a32a;
+	font-weight: 600;
+}
+
+.d4h-create-activity-wrap .d4h-ca-bad {
+	color: #d63638;
+}
+
+.d4h-create-activity-wrap .d4h-ca-muted {
+	color: #646970;
+	font-style: italic;
+}
+
+.d4h-create-activity-wrap .d4h-ca-status {
+	margin-left: 0.75em;
+}
+
+.d4h-create-activity-wrap .d4h-ca-status--error {
+	color: #d63638;
+}

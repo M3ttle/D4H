@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: D4H Core
- * Description: Shared D4H API credentials, logs, and admin menu. Required by D4H Calendar and D4H Incidents.
+ * Description: Shared D4H API credentials, logs, and admin menu. Required by D4H Calendar, D4H Incidents, and D4H Create Activity.
  * Version: 1.1.1
  * Author: Nonni
  * License: GPL v2 or later

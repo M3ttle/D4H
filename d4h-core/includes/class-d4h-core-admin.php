@@ -241,7 +241,7 @@ final class Admin {
 			<?php endif; ?>
 
 			<h2><?php esc_html_e( 'API credentials', 'd4h-core' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Shared by D4H Calendar and D4H Incidents.', 'd4h-core' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Shared by D4H Calendar, D4H Incidents, and D4H Create Activity.', 'd4h-core' ); ?></p>
 			<form method="post" action="">
 				<?php wp_nonce_field( 'd4h_core_save_credentials', 'd4h_core_nonce' ); ?>
 				<input type="hidden" name="d4h_core_action" value="save_credentials" />
@@ -282,7 +282,7 @@ final class Admin {
 				<label for="d4h_github_token"><?php esc_html_e( 'GitHub API token (optional)', 'd4h-core' ); ?></label>
 				<input type="password" id="d4h_github_token" name="d4h_github_token" value="" class="regular-text" autocomplete="off" placeholder="<?php echo $has_const_token ? esc_attr__( 'Set via wp-config.php', 'd4h-core' ) : ( $has_opt_token ? esc_attr__( 'Token saved — enter new to replace', 'd4h-core' ) : '' ); ?>" <?php echo $has_const_token ? ' readonly' : ''; ?> />
 				<button type="submit" class="button button-secondary"<?php echo $has_const_token ? ' disabled' : ''; ?>><?php esc_attr_e( 'Save', 'd4h-core' ); ?></button>
-				<p class="description"><?php esc_html_e( 'Increases rate limit from 60 to 5,000 requests/hour for plugin updates from GitHub. Create at GitHub → Settings → Developer settings → Personal access tokens. No extra scopes needed for public repos. Shared by D4H Core, Calendar, and Incidents.', 'd4h-core' ); ?> <?php echo $has_opt_token ? ' ' . esc_html__( 'Leave empty and save to remove.', 'd4h-core' ) : ''; ?></p>
+				<p class="description"><?php esc_html_e( 'Increases rate limit from 60 to 5,000 requests/hour for plugin updates from GitHub. Create at GitHub → Settings → Developer settings → Personal access tokens. No extra scopes needed for public repos. Shared by D4H Core, Calendar, Incidents, and Create Activity.', 'd4h-core' ); ?> <?php echo $has_opt_token ? ' ' . esc_html__( 'Leave empty and save to remove.', 'd4h-core' ) : ''; ?></p>
 			</form>
 			<script>
 			(function() {
@@ -306,7 +306,7 @@ final class Admin {
 			<hr />
 
 			<h2><?php esc_html_e( 'Tags', 'd4h-core' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Retrieve tag names from the D4H API. Used by D4H Incidents for filtering and display.', 'd4h-core' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Retrieve tag names from the D4H API. Used by D4H Incidents for filtering and by D4H Create Activity when matching tags on new exercises and events.', 'd4h-core' ); ?></p>
 			<p>
 				<button type="button" id="d4h-core-update-tags" class="button button-secondary">
 					<?php esc_html_e( 'Update tags', 'd4h-core' ); ?>

@@ -2,7 +2,7 @@
 
 WordPress plugins that pull team events, exercises, and incidents from the D4H Team Manager API and show them on a WordPress site.
 
-We keep API credentials in one place (D4H Core), then Calendar and Incidents use those credentials. Calendar stores events for a public calendar. Incidents fetches incident stats for charts and exports.
+We keep API credentials in one place (D4H Core), then Calendar, Incidents, and Create Activity use those credentials. Calendar stores events for a public calendar. Incidents fetches incident stats for charts and exports. Create Activity pastes spreadsheet rows and creates Full-Team exercises and events in D4H.
 
 ## Technology
 
@@ -18,20 +18,22 @@ We keep API credentials in one place (D4H Core), then Calendar and Incidents use
 | **D4H Core** | Shared API credentials, tags, API logs, sync history. Parent admin menu. |
 | **D4H Calendar** | Fetches events and exercises, stores them, displays in a public FullCalendar |
 | **D4H Incidents** | Fetches incidents, shows statistics, charts, exports to Excel/CSV and PNG |
+| **D4H Create Activity** | Paste spreadsheet rows, review, then create Full-Team exercises and events in D4H |
 
 ## Quick start
 
-1. Copy `d4h-core`, `d4h-calendar`, and `d4h-incidents` into `wp-content/plugins/`.
-2. Activate **D4H Core** first, then Calendar and Incidents.
+1. Copy `d4h-core`, `d4h-calendar`, `d4h-incidents`, and `d4h-create-activity` into `wp-content/plugins/`.
+2. Activate **D4H Core** first, then the other plugins.
 3. Go to **D4H → Settings**, enter API token, context (team or organisation), and context ID.
-4. Use **D4H → Calendar** and **D4H → Incidents** for plugin-specific options.
+4. Click **Update tags** if you will use tags on Create Activity or Incidents.
+5. Use **D4H → Calendar**, **D4H → Incidents**, and **D4H → D4H Create activity** for plugin-specific work.
 
 ## End-user manual
 
 ### Settings (D4H Core)
 
-- Enter the D4H API token, context, and context ID once. Calendar and Incidents share them.
-- Click **Update tags** so Incidents can show tag names.
+- Enter the D4H API token, context, and context ID once. Calendar, Incidents, and Create Activity share them.
+- Click **Update tags** so Incidents and Create Activity can use tag names.
 - **Sync history** and **API logs** show 10 rows by default. Change to 20 or 100. Filter by source, status, and period (all time or last 60 days). Click **Show errors (last 60 days)** to list recent failures.
 
 **Started by** means how a calendar update ran:
@@ -50,6 +52,15 @@ Failed syncs and failed API calls from the last 60 days are kept even when older
 ### Incidents
 
 - **D4H → Incidents**: Pick a date range, click Fetch data, then view tables, charts, and exports.
+
+### Create activity
+
+- **D4H → D4H Create activity**: The page lists **Available tags** from Core. Paste rows from Excel/Sheets (**Type**, Name, Start, End, Pre-plan, Description, Tags), click **Proceed**, review the table (fix type or tags if needed), then **Send to D4H**.
+- Type is **Exercise** or **Event**. The rest of the columns are the same for both.
+- Columns are separated by a **Tab**. Copying cells from Excel or Sheets already uses Tab. If you type rows by hand, use a **semicolon (;)** between columns. Several tags can go in one cell (commas) or in extra columns. Pre-plan and Description can include HTML.
+- Each row becomes a Full-Team exercise or event. Nothing is sent until you confirm.
+- Tags must match names already loaded in Core (case-insensitive). Context must be **team** if you send tags.
+- New activities show on the public calendar after the next calendar sync.
 
 ## Contribute
 

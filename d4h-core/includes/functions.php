@@ -28,7 +28,7 @@ function d4h_core_get_context(): string {
 }
 
 /**
- * Get GitHub API token for plugin updates. Used by Calendar and Incidents to increase rate limit (60→5000/hour).
+ * Get GitHub API token for plugin updates. Used by Calendar, Incidents, and Create Activity to increase rate limit (60→5000/hour).
  *
  * @return string
  */
@@ -48,7 +48,7 @@ function d4h_core_get_github_token(): string {
 }
 
 /**
- * Get D4H tags map (id => name). Used by D4H Incidents.
+ * Get D4H tags map (id => name). Used by D4H Incidents and D4H Create Activity.
  * Call "Update tags" in D4H Settings to fetch and store tags from the API.
  *
  * @return array<int, string> Tag ID => tag name

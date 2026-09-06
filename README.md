@@ -11,25 +11,26 @@ WordPress plugins that integrate with the **D4H Team Manager API** for emergency
 | **D4H Core** | Shared API credentials, team/context, API logs, sync history. Parent admin menu. |
 | **D4H Calendar** | Fetches events and exercises, stores them, displays in a public FullCalendar |
 | **D4H Incidents** | Fetches incidents, shows statistics, charts, exports to Excel/CSV and PNG |
+| **D4H Create Activity** | Paste spreadsheet rows, review, then create Full-Team exercises and events in D4H |
 
-When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents. Credentials, API logs, and sync history are stored centrally in Core. Calendar and Incidents read from Core.
+When **D4H Core** is active, a dedicated **D4H** admin menu appears with submenus: Settings, Calendar, Incidents, D4H Create activity. Credentials, API logs, and sync history are stored centrally in Core. Addons read from Core.
 
-Without Core, Calendar and Incidents add their pages under **Settings**. API credentials must be configured in D4H Core (Core is required for Incidents).
+Without Core, addons add their pages under **Settings**. API credentials must be configured in D4H Core.
 
 ### Recommended: Use D4H Core
 
-1. Copy `d4h-core`, `d4h-calendar`, and `d4h-incidents` into `wp-content/plugins/`.
-2. Activate **D4H Core** first, then Calendar and Incidents.
+1. Copy `d4h-core`, `d4h-calendar`, `d4h-incidents`, and `d4h-create-activity` into `wp-content/plugins/`.
+2. Activate **D4H Core** first, then the other plugins.
 3. Go to **D4H → Settings**, enter API token, context (team or organisation), and context ID.
-4. Use **D4H → Calendar** and **D4H → Incidents** for plugin-specific options.
+4. Use **D4H → Calendar**, **D4H → Incidents**, and **D4H → D4H Create activity** for plugin-specific options.
 
 ---
 
 ## D4H Core
 
-Stores **shared API credentials** (token, context, context ID), **tags** (id → name), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar and Incidents use credentials; Incidents uses Core tags for filtering and display.
+Stores **shared API credentials** (token, context, context ID), **tags** (id → name), **API logs**, and **sync history**. Provides the top-level **D4H** admin menu. Calendar, Incidents, and Create Activity use credentials; Incidents and Create Activity use Core tags.
 
-On **D4H → Settings**, sync history and API logs show 10 rows by default. You can switch to 20 or 100 rows, and filter by source (calendar / incidents), status (success / error), and period (all time or last 60 days). Use **Show errors (last 60 days)** to list recent failures. Failed API calls and failed syncs from the last 60 days are kept even when older successful rows are dropped.
+On **D4H → Settings**, sync history and API logs show 10 rows by default. You can switch to 20 or 100 rows, and filter by source (calendar / incidents / create-activity), status (success / error), and period (all time or last 60 days). Use **Show errors (last 60 days)** to list recent failures. Failed API calls and failed syncs from the last 60 days are kept even when older successful rows are dropped.
 
 **Started by** (sync history) uses plain labels:
 
@@ -42,8 +43,8 @@ On **D4H → Settings**, sync history and API logs show 10 rows by default. You 
 
 1. Copy `d4h-core` into `wp-content/plugins/` and activate.
 2. Go to **D4H → Settings**, enter your D4H API token, context (team or organisation), and context ID.
-3. Click **Update tags** to fetch and store tag names from the API (required for D4H Incidents tag filter and graphs).
-4. Activate Calendar and/or Incidents; they will appear under the D4H menu.
+3. Click **Update tags** to fetch and store tag names from the API (required for D4H Incidents and D4H Create Activity).
+4. Activate Calendar, Incidents, and/or Create Activity; they will appear under the D4H menu.
 
 ### Project structure
 
@@ -149,12 +150,53 @@ Fetches **incidents** from the D4H Team Manager API and displays **statistics**,
 
 ---
 
+## D4H Create Activity
+
+Pastes spreadsheet rows into WordPress, reviews them in a confirmation table, then **POSTs Full-Team exercises or events** to the D4H Team Manager API. Uses Core credentials and Core tags (no separate token).
+
+### Quick start
+
+1. Copy `d4h-create-activity` into `wp-content/plugins/` and activate (Core must be active).
+2. Go to **D4H → Settings**, set API token/context, and click **Update tags**.
+3. Go to **D4H → D4H Create activity**.
+4. Paste rows from Excel/Sheets in this column order: **Type | Name | Start | End | Pre-plan | Description | Tags**. Type is **Exercise** or **Event**. Several tags are allowed: comma-separated in one cell, extra columns after Description, or tick them on the review table. Columns are separated by a **Tab** (what Excel copies), or a **semicolon** if you type the rows by hand.
+5. Click **Proceed**, fix any invalid rows or tags in the review table, then **Send to D4H**.
+
+### Features
+
+- Bulk create up to 50 exercises or events per batch
+- First column chooses Exercise or Event (same fields otherwise)
+- Attendance is always **Full-Team** (`fullTeam: true`)
+- Pre-plan and Description accept HTML (safe tags only; scripts are stripped)
+- Several tags per activity, matched to Core tag names (case-insensitive); only known tag IDs are sent
+- **Available tags** listed on the page so you can copy the exact names
+- Confirm-before-send review table
+- Per-row success/error results; batch continues if one row fails
+- API and sync logging in Core Settings (source `create-activity`)
+- New activities appear on the public calendar after the next calendar sync
+
+### Project structure
+
+| File | Role |
+|------|------|
+| `d4h-create-activity.php` | Plugin bootstrap |
+| `includes/config.php` | Config (no secrets) |
+| `includes/class-d4h-create-activity-parser.php` | Paste parser and validation |
+| `includes/class-d4h-create-activity-api-client.php` | POST exercises/events and tags |
+| `includes/class-d4h-create-activity-admin.php` | Admin page and AJAX |
+| `includes/class-d4h-create-activity-plugin-updater.php` | Self-update from GitHub |
+| `admin/admin.js` | Paste → review → send UI |
+| `assets/admin.css` | Admin styles |
+| `uninstall.php` | Cleans up on uninstall |
+
+---
+
 ## Shared
 
 - **D4H Core**: When active, provides API credentials, API logs, sync history, and the D4H admin menu.
 - **API**: All plugins use the D4H Team Manager API v3 (HTTPS, Bearer token).
 - **Credentials**: Stored in Core (or per-plugin if Core is not active).
-- **Updates**: Core, Calendar, and Incidents support self-update from GitHub (M3ttle/D4H). GitHub API token for higher rate limits is configured in D4H → Settings.
+- **Updates**: Core, Calendar, Incidents, and Create Activity support self-update from GitHub (M3ttle/D4H). GitHub API token for higher rate limits is configured in D4H → Settings.
 - **Security**: API credentials in options; nonces and capability checks on admin/AJAX.
 
 ---
